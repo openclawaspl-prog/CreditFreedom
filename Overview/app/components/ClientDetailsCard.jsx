@@ -1,0 +1,171 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Mail, Phone, MapPin, User, CreditCard,
+  DollarSign, Edit, MessageSquare, FileText,
+} from 'lucide-react';
+
+// ---------------------------------------------------------------------------
+// Mock data — swap setClient(MOCK_CLIENT) for a real Zoho CRM API call later
+// ---------------------------------------------------------------------------
+const MOCK_CLIENT = {
+  id: 'CLT-2024-001',
+  fullName: 'Sarah Johnson',
+  email: 'sarah.johnson@email.com',
+  phone: '+1 (555) 234-5678',
+  address: '1234 Elm Street, Austin, TX 78701',
+  assignedUser: 'Michael Torres',
+  profileType: 'Premium',
+  remainingBalance: 12450.0,
+  status: 'active', // 'active' | 'pending' | 'inactive' | 'at-risk'
+  avatarInitials: 'SJ',
+  avatarColor: 'bg-violet-500',
+};
+
+const STATUS_CONFIG = {
+  active:   { label: 'Active',   color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
+  pending:  { label: 'Pending',  color: 'text-amber-700  bg-amber-50  border-amber-200'  },
+  inactive: { label: 'Inactive', color: 'text-gray-600   bg-gray-50   border-gray-200'   },
+  'at-risk':{ label: 'At Risk',  color: 'text-red-700    bg-red-50    border-red-200'     },
+};
+
+// ---------------------------------------------------------------------------
+// Loading skeleton
+// ---------------------------------------------------------------------------
+function SkeletonLine({ width = 'w-full', height = 'h-4' }) {
+  return <div className={`${width} ${height} bg-gray-200 rounded animate-pulse`} />;
+}
+
+function ClientDetailsSkeleton() {
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+      <div className="flex items-start gap-4 mb-6">
+        <div className="w-14 h-14 rounded-full bg-gray-200 animate-pulse flex-shrink-0" />
+        <div className="flex-1 space-y-2 pt-1">
+          <SkeletonLine width="w-48" height="h-5" />
+          <SkeletonLine width="w-24" />
+        </div>
+      </div>
+      <div className="space-y-4">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="flex items-center gap-3">
+            <div className="w-4 h-4 bg-gray-200 rounded animate-pulse flex-shrink-0" />
+            <SkeletonLine width="w-3/4" />
+          </div>
+        ))}
+      </div>
+      <div className="mt-6 flex gap-2">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="flex-1 h-9 bg-gray-200 rounded-lg animate-pulse" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+function DetailRow({ icon: Icon, label, value }) {
+  return (
+    <div className="flex items-start gap-3 group">
+      <div className="mt-0.5 p-1.5 rounded-md bg-gray-50 group-hover:bg-violet-50 transition-colors flex-shrink-0">
+        <Icon size={14} className="text-gray-400 group-hover:text-violet-500 transition-colors" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs text-gray-400 leading-none mb-0.5">{label}</p>
+        <p className="text-sm font-medium text-gray-700 truncate">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+function ActionButton({ icon: Icon, label, onClick, variant = 'default' }) {
+  const styles = {
+    default: 'bg-gray-50 hover:bg-gray-100 text-gray-600',
+    primary: 'bg-violet-600 hover:bg-violet-700 text-white',
+  };
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center justify-center gap-1.5 flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-colors ${styles[variant]}`}
+    >
+      <Icon size={13} />
+      {label}
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+export default function ClientDetailsCard() {
+  const [client, setClient] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // TODO: Replace with Zoho CRM API call, e.g.:
+    //   ZOHO.CRM.API.getRecord({ Entity: 'Contacts', RecordID: id })
+    //     .then(data => setClient(mapRecord(data)))
+    //     .finally(() => setLoading(false));
+    const timer = setTimeout(() => {
+      setClient(MOCK_CLIENT);
+      setLoading(false);
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (loading) return <ClientDetailsSkeleton />;
+
+  const status = STATUS_CONFIG[client.status] ?? STATUS_CONFIG.inactive;
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+
+      {/* ── Header: avatar + name + status badge ── */}
+      <div className="flex items-start justify-between gap-3 mb-5">
+        <div className="flex items-center gap-3">
+          <div className={`w-14 h-14 rounded-full ${client.avatarColor} flex items-center justify-center flex-shrink-0`}>
+            <span className="text-white font-semibold text-lg tracking-wide">
+              {client.avatarInitials}
+            </span>
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-gray-900 leading-tight">{client.fullName}</h2>
+            <p className="text-xs text-gray-400 mt-0.5">ID: {client.id}</p>
+          </div>
+        </div>
+        <span className={`text-xs font-medium px-2.5 py-1 rounded-full border whitespace-nowrap ${status.color}`}>
+          {status.label}
+        </span>
+      </div>
+
+      {/* ── Detail rows ── */}
+      <div className="space-y-3 mb-5">
+        <DetailRow icon={Mail}       label="Email"       value={client.email}        />
+        <DetailRow icon={Phone}      label="Phone"       value={client.phone}        />
+        <DetailRow icon={MapPin}     label="Address"     value={client.address}      />
+        <DetailRow icon={User}       label="Assigned To" value={client.assignedUser} />
+        <DetailRow icon={CreditCard} label="Profile"     value={client.profileType}  />
+      </div>
+
+      {/* ── Remaining balance highlight ── */}
+      <div className="flex items-center justify-between bg-violet-50 rounded-xl px-4 py-3 mb-5 border border-violet-100">
+        <div className="flex items-center gap-2">
+          <DollarSign size={15} className="text-violet-500" />
+          <span className="text-xs font-medium text-violet-700">Remaining Balance</span>
+        </div>
+        <span className="text-sm font-bold text-violet-800">
+          ${client.remainingBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+        </span>
+      </div>
+
+      {/* ── Quick actions ── */}
+      <div className="flex gap-2">
+        <ActionButton icon={Edit}         label="Edit"    onClick={() => { /* TODO: open edit panel */ }} />
+        <ActionButton icon={MessageSquare} label="Message" onClick={() => { /* TODO: open chat   */ }} />
+        <ActionButton icon={FileText}     label="Notes"   onClick={() => { /* TODO: open notes  */ }} />
+      </div>
+
+    </div>
+  );
+}

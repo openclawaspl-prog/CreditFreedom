@@ -1,0 +1,28 @@
+[debug] [2026-05-07T05:10:53.687Z] : >>>> HTTP REQUEST : POST https://accounts.zoho.in/oauth/v2/token/revoke 
+Query params: {"token":"1000.1973e1abad6b2bf64cff4038de697a4e.ffbfe359b01a75ef6a24d2daaee43d85"}
+
+[debug] [2026-05-07T05:10:55.209Z] : <<<< HTTP RESPONSE : 200
+Response Headers{"server":"ZGS","date":"Thu, 07 May 2026 05:10:54 GMT","content-length":"20","connection":"keep-alive","set-cookie":["zalb_50e15ce8e1=0059c873eb42bdc5c50ae80f072a4b25; Path=/; Secure; HttpOnly","iamcsr=70fcdf87-0769-4ae6-9e09-7dbf35081b23;path=/;SameSite=Strict;Secure;priority=high"],"x-content-type-options":"nosniff","content-security-policy":"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.zohocdn.com https://*.zoho.com https://*.zoho.eu https://*.zoho.com.cn https://*.zoho.com.au https://*.zoho.jp https://*.zoho.uk https://*.zoho.sa https://*.zohocloud.ca; report-uri https://logsapi.zoho.in/csplog?service=accounts;","x-frame-options":"SAMEORIGIN","content-language":"en-US","strict-transport-security":"max-age=64072000; includeSubDomains; preload"}
+
+[debug] [2026-05-07T05:10:55.210Z] : TOTAL TIME TAKEN : 1502 ms
+
+[info] [2026-05-07T05:10:55.251Z] : √ You've been logged out.
+[info] [2026-05-07T05:11:21.327Z] : 
+[info] [2026-05-07T05:11:21.332Z] : Click this URL to login to your Zoho Account
+[info] [2026-05-07T05:11:21.332Z] : https://accounts.zoho.com/oauth/v2/auth?client_id=1000.gnjph6g96nf23jd4u14tba2egykhik&scope=ZAPPS.apps.ALL%20AaaServer.profile.READ%20ZMProcessors.connectors.CREATE&response_type=code&access_type=offline&prompt=consent&redirect_uri=http%3A%2F%2Flocalhost%3A9005
+[info] [2026-05-07T05:11:21.334Z] : Note: To login to CN DC, update the above URL from accounts.zoho.com to accounts.zoho.com.cn
+[info] [2026-05-07T05:11:21.335Z] : 
+[debug] [2026-05-07T05:13:04.746Z] : DCType Of the user is in
+[debug] [2026-05-07T05:13:04.751Z] : >>>> HTTP REQUEST : POST https://accounts.zoho.in/oauth/v2/token 
+<request query omitted>
+
+[debug] [2026-05-07T05:13:05.167Z] : <<<< HTTP RESPONSE : 200
+Response Headers{"server":"ZGS","date":"Thu, 07 May 2026 05:13:04 GMT","content-type":"application/json;charset=UTF-8","content-length":"336","connection":"keep-alive","set-cookie":["zalb_50e15ce8e1=0059c873eb42bdc5c50ae80f072a4b25; Path=/; Secure; HttpOnly","iamcsr=d0a84ea8-4f15-49de-a886-7b9c651fa16e;path=/;SameSite=Strict;Secure;priority=high"],"cache-control":"no-store","x-content-type-options":"nosniff","content-security-policy":"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.zohocdn.com https://*.zoho.com https://*.zoho.eu https://*.zoho.com.cn https://*.zoho.com.au https://*.zoho.jp https://*.zoho.uk https://*.zoho.sa https://*.zohocloud.ca; report-uri https://logsapi.zoho.in/csplog?service=accounts;","pragma":"no-cache","x-frame-options":"SAMEORIGIN","content-language":"en-US","strict-transport-security":"max-age=64072000; includeSubDomains; preload"}
+
+[debug] [2026-05-07T05:13:05.168Z] : TOTAL TIME TAKEN : 416 ms
+
+[debug] [2026-05-07T05:13:05.183Z] : >>>> HTTP REQUEST : GET https://accounts.zoho.in/oauth/user/info 
+
+[debug] [2026-05-07T05:13:05.310Z] : <<<< HTTP RESPONSE : 200
+Response Headers{"server":"ZGS","date":"Thu, 07 May 2026 05:13:04 GMT","content-type":"application/json;charset=UTF-8","content-length":"70","connection":"keep-alive","set-cookie":["zalb_50e15ce8e1=31a7aa4e979668a9e3f09f3a59e92946; Path=/; Secure; HttpOnly","iamcsr=5ec168cf-2cc7-4154-b08e-2158a6ce6dd9;path=/;SameSite=Strict;Secure;priority=high"],"x-content-type-options":"nosniff","content-security-policy":"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.zohocdn.com https://*.zoho.com https://*.zoho.eu https://*.zoho.com.cn https://*.zoho.com.au https://*.zoho.jp https://*.zoho.uk https://*.zoho.sa https://*.zohocloud.ca; report-uri https://logsapi.zoho.in/csplog?service=accounts;","cache-control":"private,no-cache,no-store,max-age=0,must-revalidate","pragma":"no-cache","expires":"Thu, 01 Jan 1970 00:00:00 GMT","x-frame-options":"SAMEORIGIN","content-language":"en-US","strict-transport-security":"max-age=64072000; includeSubDomains; preload"}
+

@@ -26,3 +26,22 @@ Response Headers{"server":"ZGS","date":"Thu, 07 May 2026 05:13:04 GMT","content-
 [debug] [2026-05-07T05:13:05.310Z] : <<<< HTTP RESPONSE : 200
 Response Headers{"server":"ZGS","date":"Thu, 07 May 2026 05:13:04 GMT","content-type":"application/json;charset=UTF-8","content-length":"70","connection":"keep-alive","set-cookie":["zalb_50e15ce8e1=31a7aa4e979668a9e3f09f3a59e92946; Path=/; Secure; HttpOnly","iamcsr=5ec168cf-2cc7-4154-b08e-2158a6ce6dd9;path=/;SameSite=Strict;Secure;priority=high"],"x-content-type-options":"nosniff","content-security-policy":"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.zohocdn.com https://*.zoho.com https://*.zoho.eu https://*.zoho.com.cn https://*.zoho.com.au https://*.zoho.jp https://*.zoho.uk https://*.zoho.sa https://*.zohocloud.ca; report-uri https://logsapi.zoho.in/csplog?service=accounts;","cache-control":"private,no-cache,no-store,max-age=0,must-revalidate","pragma":"no-cache","expires":"Thu, 01 Jan 1970 00:00:00 GMT","x-frame-options":"SAMEORIGIN","content-language":"en-US","strict-transport-security":"max-age=64072000; includeSubDomains; preload"}
 
+[info] [2026-05-07T07:23:57.958Z] : 
+[info] [2026-05-07T07:23:57.961Z] : Click this URL to login to your Zoho Account
+[info] [2026-05-07T07:23:57.962Z] : https://accounts.zoho.com/oauth/v2/auth?client_id=1000.gnjph6g96nf23jd4u14tba2egykhik&scope=ZAPPS.apps.ALL%20AaaServer.profile.READ%20ZMProcessors.connectors.CREATE&response_type=code&access_type=offline&prompt=consent&redirect_uri=http%3A%2F%2Flocalhost%3A9005
+[info] [2026-05-07T07:23:57.962Z] : Note: To login to CN DC, update the above URL from accounts.zoho.com to accounts.zoho.com.cn
+[info] [2026-05-07T07:23:57.963Z] : 
+[debug] [2026-05-07T07:25:12.473Z] : DCType Of the user is in
+[debug] [2026-05-07T07:25:12.476Z] : >>>> HTTP REQUEST : POST https://accounts.zoho.in/oauth/v2/token 
+<request query omitted>
+
+[debug] [2026-05-07T07:25:13.902Z] : <<<< HTTP RESPONSE : 200
+Response Headers{"server":"ZGS","date":"Thu, 07 May 2026 07:25:13 GMT","content-type":"application/json;charset=UTF-8","content-length":"336","connection":"keep-alive","set-cookie":["zalb_50e15ce8e1=0059c873eb42bdc5c50ae80f072a4b25; Path=/; Secure; HttpOnly","iamcsr=7a70d1ac-b07d-4150-b95a-0228a7b71fc8;path=/;SameSite=Strict;Secure;priority=high"],"cache-control":"no-store","x-content-type-options":"nosniff","content-security-policy":"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.zohocdn.com https://*.zoho.com https://*.zoho.eu https://*.zoho.com.cn https://*.zoho.com.au https://*.zoho.jp https://*.zoho.uk https://*.zoho.sa https://*.zohocloud.ca; report-uri https://logsapi.zoho.in/csplog?service=accounts;","pragma":"no-cache","x-frame-options":"SAMEORIGIN","content-language":"en-US","strict-transport-security":"max-age=64072000; includeSubDomains; preload"}
+
+[debug] [2026-05-07T07:25:13.903Z] : TOTAL TIME TAKEN : 1424 ms
+
+[debug] [2026-05-07T07:25:13.920Z] : >>>> HTTP REQUEST : GET https://accounts.zoho.in/oauth/user/info 
+
+[debug] [2026-05-07T07:25:14.032Z] : <<<< HTTP RESPONSE : 200
+Response Headers{"server":"ZGS","date":"Thu, 07 May 2026 07:25:14 GMT","content-type":"application/json;charset=UTF-8","content-length":"70","connection":"keep-alive","set-cookie":["zalb_50e15ce8e1=31a7aa4e979668a9e3f09f3a59e92946; Path=/; Secure; HttpOnly","iamcsr=ec320e0b-6cd7-4ae1-8cf1-e602a4335c18;path=/;SameSite=Strict;Secure;priority=high"],"x-content-type-options":"nosniff","content-security-policy":"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.zohocdn.com https://*.zoho.com https://*.zoho.eu https://*.zoho.com.cn https://*.zoho.com.au https://*.zoho.jp https://*.zoho.uk https://*.zoho.sa https://*.zohocloud.ca; report-uri https://logsapi.zoho.in/csplog?service=accounts;","cache-control":"private,no-cache,no-store,max-age=0,must-revalidate","pragma":"no-cache","expires":"Thu, 01 Jan 1970 00:00:00 GMT","x-frame-options":"SAMEORIGIN","content-language":"en-US","strict-transport-security":"max-age=64072000; includeSubDomains; preload"}
+

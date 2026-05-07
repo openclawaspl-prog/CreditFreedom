@@ -5,200 +5,425 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CreditFreedom – Client Details</title>
 
-  <!-- Tailwind CSS (CDN) -->
   <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- React 18 (CDN) -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-
-  <!-- Lucide React (CDN) -->
-  <script src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.js"></script>
-
-  <!-- Babel – transpiles JSX in-browser during development -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://live.zwidgets.com/js-sdk/1.0/ZohoEmbededAppSDK.min.js"></script>
 
   <style>
-    body { background: #f4f5f7; font-family: Inter, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { background: #f1f3f5; font-family: Inter, system-ui, sans-serif; margin: 0; }
+    input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.5; cursor: pointer; }
   </style>
 </head>
-<body class="p-6 min-h-screen">
+<body class="p-4 min-h-screen">
 
-  <div id="root" class="max-w-sm mx-auto"></div>
+  <div id="root" class="max-w-md mx-auto"></div>
 
   <script type="text/babel">
-    const { useState, useEffect } = React;
-    const { Mail, Phone, MapPin, User, CreditCard, DollarSign, Edit, MessageSquare, FileText } = LucideReact;
+    const { useState, useEffect, useRef } = React;
 
-    // -------------------------------------------------------------------------
-    // Mock data — replace with Zoho CRM API call when ready
-    // -------------------------------------------------------------------------
-    const MOCK_CLIENT = {
-      id: 'CLT-2024-001',
-      fullName: 'Sarah Johnson',
-      email: 'sarah.johnson@email.com',
-      phone: '+1 (555) 234-5678',
-      address: '1234 Elm Street, Austin, TX 78701',
-      assignedUser: 'Michael Torres',
-      profileType: 'Premium',
-      remainingBalance: 12450.00,
-      status: 'active', // 'active' | 'pending' | 'inactive' | 'at-risk'
-      avatarInitials: 'SJ',
-      avatarColor: 'bg-violet-500',
-    };
+    /* ═══════════════════════════════════════════
+       CACHE — stale-while-revalidate via localStorage
 
-    const STATUS_CONFIG = {
-      active:    { label: 'Active',   color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
-      pending:   { label: 'Pending',  color: 'text-amber-700 bg-amber-50 border-amber-200'       },
-      inactive:  { label: 'Inactive', color: 'text-gray-600 bg-gray-50 border-gray-200'          },
-      'at-risk': { label: 'At Risk',  color: 'text-red-700 bg-red-50 border-red-200'             },
-    };
+       Flow:
+         1. Read cache → render instantly (no skeleton)
+         2. Fetch fresh from Zoho in background
+         3. Delta check via Modified_Time
+            → same : skip re-render (no flicker)
+            → changed : update UI + cache
+         4. After save → write fresh record into cache
 
-    // -------------------------------------------------------------------------
-    // Loading skeleton
-    // -------------------------------------------------------------------------
-    function SkeletonLine({ width = 'w-full', height = 'h-4' }) {
-      return <div className={`${width} ${height} bg-gray-200 rounded animate-pulse`} />;
+       TTL: 30 min. Expired entries are pruned on read.
+       Storage: only the 7 fields we use (~300 bytes/record)
+    ═══════════════════════════════════════════ */
+    var CACHE_NS  = 'cf_crm_';          // namespace prefix
+    var CACHE_TTL = 30 * 60 * 1000;    // 30 minutes in ms
+
+    /* Store only the fields we actually display/edit */
+    function pickFields(r) {
+      return {
+        id:            r.id,
+        Date_of_Birth: r.Date_of_Birth || null,
+        Office_Phone:  r.Office_Phone  || null,
+        Email:         r.Email         || null,
+        Assigned_To:   r.Assigned_To   || null,
+        Created_Time:  r.Created_Time  || null,
+        Modified_Time: r.Modified_Time || null,
+      };
     }
 
-    function ClientDetailsSkeleton() {
+    function cacheRead(recordId) {
+      try {
+        var raw = localStorage.getItem(CACHE_NS + recordId);
+        if (!raw) return null;
+        var entry = JSON.parse(raw);
+        /* Prune expired entry */
+        if (Date.now() - entry.ts > CACHE_TTL) {
+          localStorage.removeItem(CACHE_NS + recordId);
+          return null;
+        }
+        return entry.record;
+      } catch (e) {
+        return null; // localStorage unavailable or corrupt JSON
+      }
+    }
+
+    function cacheWrite(recordId, record) {
+      try {
+        localStorage.setItem(CACHE_NS + recordId, JSON.stringify({
+          record: pickFields(record),
+          ts: Date.now(),
+        }));
+      } catch (e) {
+        /* Quota exceeded — skip silently, app still works */
+      }
+    }
+
+    /* Delta: Modified_Time is Zoho's authoritative change signal.
+       If it's the same the record hasn't changed on the server. */
+    function hasChanged(cached, fresh) {
+      if (!cached || !fresh) return true;
+      return cached.Modified_Time !== fresh.Modified_Time;
+    }
+
+    /* ═══════════════════════════════════════════
+       Icons
+    ═══════════════════════════════════════════ */
+    function Svg({ size = 16, className = '', children }) {
       return (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <div className="flex items-start gap-4 mb-6">
-            <div className="w-14 h-14 rounded-full bg-gray-200 animate-pulse flex-shrink-0" />
-            <div className="flex-1 space-y-2 pt-1">
-              <SkeletonLine width="w-48" height="h-5" />
-              <SkeletonLine width="w-24" />
-            </div>
-          </div>
-          <div className="space-y-4">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <div className="w-4 h-4 bg-gray-200 rounded animate-pulse flex-shrink-0" />
-                <SkeletonLine width="w-3/4" />
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" strokeWidth={2}
+             strokeLinecap="round" strokeLinejoin="round" className={className}>
+          {children}
+        </svg>
+      );
+    }
+    const EditIcon  = (p) => <Svg {...p}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></Svg>;
+    const EmailIcon = (p) => <Svg {...p}><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></Svg>;
+    const SmsIcon   = (p) => <Svg {...p}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></Svg>;
+    const CheckIcon = (p) => <Svg {...p}><polyline points="20 6 9 17 4 12"/></Svg>;
+    const XIcon     = (p) => <Svg {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></Svg>;
+
+    /* ═══════════════════════════════════════════
+       Formatters
+    ═══════════════════════════════════════════ */
+    function fmtDate(str) {
+      if (!str) return '—';
+      const d = new Date(str);
+      return d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
+    }
+
+    function fmtDateTime(str) {
+      if (!str) return '—';
+      const d   = new Date(str);
+      const day = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+      const t   = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      return `${day} at ${t}`;
+    }
+
+    function mapRecord(r) {
+      const assigned = r.Assigned_To;
+      return {
+        dateOfBirth:  fmtDate(r.Date_of_Birth),
+        assignedTo:   assigned ? (typeof assigned === 'object' ? assigned.name : assigned) : '—',
+        officePhone:  r.Office_Phone || '—',
+        primaryEmail: r.Email        || '—',
+        created:      fmtDateTime(r.Created_Time),
+        updated:      fmtDateTime(r.Modified_Time),
+      };
+    }
+
+    /* ═══════════════════════════════════════════
+       Skeleton — shown only when no cached data
+    ═══════════════════════════════════════════ */
+    function Bone({ w = 'w-full', h = 'h-4' }) {
+      return <div className={`${w} ${h} rounded bg-gray-200 animate-pulse`} />;
+    }
+
+    function CardSkeleton() {
+      return (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4">
+          <Bone w="w-28" h="h-5" />
+          <div className="mt-2 divide-y divide-gray-100">
+            {[0,1,2,3,4,5].map(i => (
+              <div key={i} className="flex justify-between items-center py-3">
+                <Bone w="w-24" /><Bone w="w-36" />
               </div>
             ))}
           </div>
-          <div className="mt-6 flex gap-2">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="flex-1 h-9 bg-gray-200 rounded-lg animate-pulse" />
-            ))}
+          <div className="mt-3 pt-4 border-t border-gray-200 flex gap-2">
+            {[0,1,2].map(i => <div key={i} className="flex-1 h-10 rounded-lg bg-gray-200 animate-pulse" />)}
           </div>
         </div>
       );
     }
 
-    // -------------------------------------------------------------------------
-    // Sub-components
-    // -------------------------------------------------------------------------
-    function DetailRow({ icon: Icon, label, value }) {
+    /* ═══════════════════════════════════════════
+       Row components
+    ═══════════════════════════════════════════ */
+    function DisplayRow({ label, value, bold = false }) {
       return (
-        <div className="flex items-start gap-3 group">
-          <div className="mt-0.5 p-1.5 rounded-md bg-gray-50 group-hover:bg-violet-50 transition-colors flex-shrink-0">
-            <Icon size={14} className="text-gray-400 group-hover:text-violet-500 transition-colors" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs text-gray-400 leading-none mb-0.5">{label}</p>
-            <p className="text-sm font-medium text-gray-700 truncate">{value}</p>
-          </div>
+        <div className="flex items-start justify-between gap-6 py-3">
+          <span className="text-sm text-gray-500 shrink-0 w-28">{label}</span>
+          <span className={`text-sm text-right break-words max-w-xs ${bold ? 'font-semibold text-gray-900' : 'font-normal text-gray-800'}`}>
+            {value}
+          </span>
         </div>
       );
     }
 
-    function ActionButton({ icon: Icon, label, onClick, variant = 'default' }) {
-      const styles = {
-        default: 'bg-gray-50 hover:bg-gray-100 text-gray-600',
-        primary: 'bg-violet-600 hover:bg-violet-700 text-white',
-      };
+    function EditRow({ label, field, value, type = 'text', autoFocus = false, onChange }) {
       return (
-        <button
-          onClick={onClick}
-          className={`flex items-center justify-center gap-1.5 flex-1 py-2 px-3 rounded-lg text-xs font-medium transition-colors ${styles[variant]}`}
-        >
-          <Icon size={13} />
-          {label}
-        </button>
+        <div className="flex items-center gap-4 py-2">
+          <span className="text-sm text-gray-500 shrink-0 w-28">{label}</span>
+          <input
+            type={type}
+            value={value}
+            autoFocus={autoFocus}
+            onChange={e => onChange(field, e.target.value)}
+            className="flex-1 text-sm text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-violet-400 transition-all"
+          />
+        </div>
       );
     }
 
-    // -------------------------------------------------------------------------
-    // Main component
-    // -------------------------------------------------------------------------
+    /* ═══════════════════════════════════════════
+       Main card
+    ═══════════════════════════════════════════ */
     function ClientDetailsCard() {
-      const [client, setClient] = useState(null);
-      const [loading, setLoading] = useState(true);
+      const [client,     setClient]     = useState(null);
+      const [rawRecord,  setRawRecord]  = useState(null);
+      const [loading,    setLoading]    = useState(true);   // true only when no cache
+      const [refreshing, setRefreshing] = useState(false);  // true during background re-fetch
+      const [error,      setError]      = useState(null);
 
+      const [isEditing,  setIsEditing]  = useState(false);
+      const [editVals,   setEditVals]   = useState({});
+      const [saving,     setSaving]     = useState(false);
+      const [saveError,  setSaveError]  = useState(null);
+
+      /* Keep keyboard handler from reading stale editVals */
+      const editValsRef = useRef({});
+      useEffect(() => { editValsRef.current = editVals; }, [editVals]);
+
+      /* ── Load record ── */
       useEffect(() => {
-        // TODO: Replace with Zoho CRM API call, e.g.:
-        //   ZOHO.CRM.API.getRecord({ Entity: 'Contacts', RecordID: id })
-        //     .then(data => setClient(mapRecord(data)))
-        //     .finally(() => setLoading(false));
-        const timer = setTimeout(() => {
-          setClient(MOCK_CLIENT);
-          setLoading(false);
-        }, 1200);
-        return () => clearTimeout(timer);
+        ZOHO.embeddedApp.on("PageLoad", function(data) {
+          var recordId = data.EntityId;
+
+          /* ① Cache hit → instant render, no skeleton */
+          var cached = cacheRead(recordId);
+          if (cached) {
+            setRawRecord(cached);
+            setClient(mapRecord(cached));
+            setLoading(false);
+            setRefreshing(true); // show subtle background-refresh indicator
+          }
+
+          /* ② Always fetch fresh from Zoho (background if cached) */
+          ZOHO.CRM.API.getRecord({ Entity: "Contacts", RecordID: recordId })
+            .then(function(res) {
+              if (res.data && res.data[0]) {
+                var fresh = res.data[0];
+
+                /* ③ Delta check — only update UI if data actually changed */
+                if (hasChanged(cached, fresh)) {
+                  setRawRecord(fresh);
+                  setClient(mapRecord(fresh));
+                }
+
+                /* ④ Always refresh the cache (resets TTL too) */
+                cacheWrite(recordId, fresh);
+
+              } else if (!cached) {
+                setError("Record not found.");
+              }
+            })
+            .catch(function() {
+              /* If we have cached data, show it silently; otherwise show error */
+              if (!cached) setError("Failed to load client data.");
+            })
+            .finally(function() {
+              setLoading(false);
+              setRefreshing(false);
+            });
+        });
+
+        ZOHO.embeddedApp.init();
       }, []);
 
-      if (loading) return <ClientDetailsSkeleton />;
+      /* ── Keyboard shortcuts (only active while editing) ── */
+      useEffect(() => {
+        if (!isEditing) return;
+        function onKey(e) {
+          if (e.key === 'Escape') doCancel();
+          if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+            e.preventDefault();
+            doSave(editValsRef.current);
+          }
+        }
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+      }, [isEditing]);
 
-      const status = STATUS_CONFIG[client.status] ?? STATUS_CONFIG.inactive;
+      /* ── Edit actions ── */
+      function startEdit() {
+        setEditVals({
+          Date_of_Birth: rawRecord.Date_of_Birth || '',
+          Office_Phone:  rawRecord.Office_Phone  || '',
+          Email:         rawRecord.Email         || '',
+        });
+        setSaveError(null);
+        setIsEditing(true);
+      }
 
+      function doCancel() {
+        setIsEditing(false);
+        setEditVals({});
+        setSaveError(null);
+      }
+
+      function handleFieldChange(field, value) {
+        setEditVals(function(prev) {
+          var next = Object.assign({}, prev);
+          next[field] = value;
+          return next;
+        });
+      }
+
+      function doSave(vals) {
+        setSaving(true);
+        setSaveError(null);
+
+        ZOHO.CRM.API.updateRecord({
+          Entity: "Contacts",
+          APIData: {
+            id:            rawRecord.id,
+            Date_of_Birth: vals.Date_of_Birth || null,
+            Office_Phone:  vals.Office_Phone  || null,
+            Email:         vals.Email         || null,
+          },
+          Trigger: ["workflow"],
+        })
+        .then(function() {
+          return ZOHO.CRM.API.getRecord({ Entity: "Contacts", RecordID: rawRecord.id });
+        })
+        .then(function(res) {
+          if (res.data && res.data[0]) {
+            var fresh = res.data[0];
+            setRawRecord(fresh);
+            setClient(mapRecord(fresh));
+            /* ⑤ Update cache with saved data */
+            cacheWrite(rawRecord.id, fresh);
+          }
+          setIsEditing(false);
+          setEditVals({});
+        })
+        .catch(function() {
+          setSaveError("Save failed. Please try again.");
+        })
+        .finally(function() {
+          setSaving(false);
+        });
+      }
+
+      /* ── Render guards ── */
+      if (loading) return <CardSkeleton />;
+
+      if (error) return (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-10 text-center">
+          <p className="text-sm text-red-500">{error}</p>
+        </div>
+      );
+
+      /* ── Card ── */
       return (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4">
 
-          {/* Header: avatar + name + status badge */}
-          <div className="flex items-start justify-between gap-3 mb-5">
-            <div className="flex items-center gap-3">
-              <div className={`w-14 h-14 rounded-full ${client.avatarColor} flex items-center justify-center flex-shrink-0`}>
-                <span className="text-white font-semibold text-lg tracking-wide">
-                  {client.avatarInitials}
-                </span>
-              </div>
-              <div>
-                <h2 className="text-base font-semibold text-gray-900 leading-tight">{client.fullName}</h2>
-                <p className="text-xs text-gray-400 mt-0.5">ID: {client.id}</p>
-              </div>
-            </div>
-            <span className={`text-xs font-medium px-2.5 py-1 rounded-full border whitespace-nowrap ${status.color}`}>
-              {status.label}
-            </span>
-          </div>
-
-          {/* Detail rows */}
-          <div className="space-y-3 mb-5">
-            <DetailRow icon={Mail}       label="Email"       value={client.email}        />
-            <DetailRow icon={Phone}      label="Phone"       value={client.phone}        />
-            <DetailRow icon={MapPin}     label="Address"     value={client.address}      />
-            <DetailRow icon={User}       label="Assigned To" value={client.assignedUser} />
-            <DetailRow icon={CreditCard} label="Profile"     value={client.profileType}  />
-          </div>
-
-          {/* Remaining balance highlight */}
-          <div className="flex items-center justify-between bg-violet-50 rounded-xl px-4 py-3 mb-5 border border-violet-100">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="text-base font-bold text-gray-900">Client Details</h2>
             <div className="flex items-center gap-2">
-              <DollarSign size={15} className="text-violet-500" />
-              <span className="text-xs font-medium text-violet-700">Remaining Balance</span>
+              {/* Background-refresh spinner — visible only while revalidating cache */}
+              {refreshing && !isEditing && (
+                <div
+                  title="Refreshing…"
+                  className="w-3.5 h-3.5 rounded-full border-2 border-gray-200 border-t-gray-500 animate-spin"
+                />
+              )}
+              {isEditing && (
+                <span className="text-xs text-gray-400">Enter · Esc</span>
+              )}
             </div>
-            <span className="text-sm font-bold text-violet-800">
-              ${client.remainingBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-            </span>
           </div>
 
-          {/* Quick actions */}
-          <div className="flex gap-2">
-            <ActionButton icon={Edit}          label="Edit"    onClick={() => { /* TODO: open edit panel */ }} />
-            <ActionButton icon={MessageSquare} label="Message" onClick={() => { /* TODO: open chat    */ }} />
-            <ActionButton icon={FileText}      label="Notes"   onClick={() => { /* TODO: open notes   */ }} />
+          {/* Rows */}
+          <div className="mt-2 divide-y divide-gray-100">
+            {isEditing ? (
+              <>
+                <EditRow label="Date of Birth" field="Date_of_Birth" value={editVals.Date_of_Birth} type="date"  autoFocus={true} onChange={handleFieldChange} />
+                <DisplayRow label="Assigned To"   value={client.assignedTo}  bold />
+                <EditRow label="Office Phone"  field="Office_Phone"  value={editVals.Office_Phone}  type="tel"   onChange={handleFieldChange} />
+                <EditRow label="Primary Email" field="Email"         value={editVals.Email}          type="email" onChange={handleFieldChange} />
+                <DisplayRow label="Created" value={client.created} bold />
+                <DisplayRow label="Updated" value={client.updated} bold />
+              </>
+            ) : (
+              <>
+                <DisplayRow label="Date of Birth"  value={client.dateOfBirth}   />
+                <DisplayRow label="Assigned To"    value={client.assignedTo}    bold />
+                <DisplayRow label="Office Phone"   value={client.officePhone}   />
+                <DisplayRow label="Primary Email"  value={client.primaryEmail}  />
+                <DisplayRow label="Created"        value={client.created}       bold />
+                <DisplayRow label="Updated"        value={client.updated}       bold />
+              </>
+            )}
           </div>
+
+          {saveError && (
+            <p className="mt-2 text-xs text-red-500 text-center">{saveError}</p>
+          )}
+
+          <div className="border-t border-gray-200 mt-3 mb-3" />
+
+          {/* Action buttons */}
+          {isEditing ? (
+            <div className="flex gap-2">
+              <button onClick={() => doSave(editVals)} disabled={saving}
+                className="flex items-center justify-center gap-1.5 flex-1 py-2.5 rounded-lg bg-gray-900 hover:bg-gray-700 text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                <CheckIcon size={14} />
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+              <button onClick={doCancel} disabled={saving}
+                className="flex items-center justify-center gap-1.5 flex-1 py-2.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-600 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                <XIcon size={14} />
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <button onClick={startEdit}
+                className="flex items-center justify-center gap-1.5 flex-1 py-2.5 rounded-lg bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 text-sm font-medium transition-colors">
+                <EditIcon size={14} />Edit
+              </button>
+              <button onClick={() => {/* TODO: Zoho email compose */}}
+                className="flex items-center justify-center gap-1.5 flex-1 py-2.5 rounded-lg bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 text-sm font-medium transition-colors">
+                <EmailIcon size={14} />Send Email
+              </button>
+              <button onClick={() => {/* TODO: Zoho SMS action */}}
+                className="flex items-center justify-center gap-1.5 flex-1 py-2.5 rounded-lg bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 text-sm font-medium transition-colors">
+                <SmsIcon size={14} />Send SMS
+              </button>
+            </div>
+          )}
 
         </div>
       );
     }
 
-    // Mount
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<ClientDetailsCard />);
+    ReactDOM.createRoot(document.getElementById('root')).render(<ClientDetailsCard />);
   </script>
 
 </body>

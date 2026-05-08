@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Monitoring Log In</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap"
+    rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script>
+    window.__cfNativeAddEventListener = window.addEventListener;
+    window.addEventListener = function (type, listener, options) {
+      if (type === 'unload') return;
+      return window.__cfNativeAddEventListener.call(this, type, listener, options);
+    };
+  </script>
+  <script src="https://live.zwidgets.com/js-sdk/1.1/ZohoEmbededAppSDK.min.js"></script>
+  <script>
+    window.addEventListener = window.__cfNativeAddEventListener;
+    delete window.__cfNativeAddEventListener;
+  </script>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f7fb;
+      --panel: rgba(255, 255, 255, 0.82);
+      --text: #141821;
+      --muted: #5f6675;
+      --border: rgba(27, 33, 48, 0.08);
+      --shadow: 0 24px 60px rgba(24, 32, 46, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body,
+    #root {
+      min-height: 100%;
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(125, 147, 255, 0.22), transparent 32%),
+        radial-gradient(circle at top right, rgba(140, 224, 214, 0.20), transparent 28%),
+        linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    }
+
+    .app-shell {
+      position: relative;
+      min-height: 100vh;
+      padding: 24px;
+      overflow: hidden;
+    }
+
+    .app-shell::before,
+    .app-shell::after {
+      content: "";
+      position: fixed;
+      inset: auto;
+      pointer-events: none;
+      border-radius: 999px;
+      filter: blur(10px);
+      opacity: 0.85;
+    }
+
+    .app-shell::before {
+      width: 180px;
+      height: 180px;
+      top: -50px;
+      right: 20px;
+      background: rgba(66, 87, 255, 0.08);
+    }
+
+    .app-shell::after {
+      width: 240px;
+      height: 240px;
+      bottom: -90px;
+      left: -70px;
+      background: rgba(255, 177, 177, 0.12);
+    }
+
+    .glass-panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+
+    .page-title {
+      font-family: "Space Grotesk", Inter, system-ui, sans-serif;
+      letter-spacing: -0.04em;
+    }
+
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 18px;
+    }
+
+    .card {
+      position: relative;
+      min-height: 296px;
+      border-radius: 20px;
+      padding: 22px 22px 20px;
+      border: 1px solid rgba(20, 24, 33, 0.05);
+      box-shadow: 0 16px 40px rgba(17, 24, 39, 0.06);
+      overflow: hidden;
+    }
+
+    .card::after {
+      content: "";
+      position: absolute;
+      inset: auto -20px -18px auto;
+      width: 120px;
+      height: 120px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.28);
+      filter: blur(2px);
+    }
+
+    .card-title {
+      font-family: "Space Grotesk", Inter, system-ui, sans-serif;
+      letter-spacing: -0.03em;
+    }
+
+    .detail-row {
+      display: grid;
+      grid-template-columns: 118px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+      padding: 10px 0;
+    }
+
+    .detail-label {
+      color: rgba(20, 24, 33, 0.65);
+      font-size: 0.92rem;
+      line-height: 1.4;
+    }
+
+    .detail-value {
+      font-size: 1rem;
+      font-weight: 600;
+      color: rgba(20, 24, 33, 0.92);
+      word-break: break-word;
+    }
+
+    @media (max-width: 640px) {
+      .app-shell {
+        padding: 16px;
+      }
+
+      .detail-row {
+        grid-template-columns: 90px minmax(0, 1fr);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="text/babel" src="./main.jsx"></script>
+</body>
+
+</html>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CreditFreedom – Client Details</title>
+  <title>CreditFreedom Dashboard</title>
 
   <script src="https://cdn.tailwindcss.com"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -13,24 +13,47 @@
 
   <style>
     * { box-sizing: border-box; }
-    body { background: #f1f3f5; font-family: Inter, system-ui, sans-serif; margin: 0; }
+    html { margin: 0; padding: 0; }
+    body {
+      margin: 0;
+      padding: 12px;
+      background: #f1f3f5;
+      font-family: Inter, system-ui, sans-serif;
+    }
+    @media (min-width: 768px)  { body { padding: 16px; } }
+    @media (min-width: 1024px) { body { padding: 20px; } }
     input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.5; cursor: pointer; }
   </style>
 </head>
-<body class="p-4 min-h-screen">
+<body>
 
-  <div id="root" class="max-w-6xl mx-auto"></div>
+  <div id="root" class="max-w-[1400px] mx-auto"></div>
 
-  <!-- Client Details Card Script -->
+  <!-- Column 1 -->
   <script type="text/babel" src="./components/ClientDetailsCard.jsx"></script>
 
-  <!-- Payment Details & Actions Card Script -->
+  <!-- Column 2 -->
   <script type="text/babel" src="./components/PaymentdetailsCard.jsx"></script>
 
-  <!-- Comments Card Script -->
+  <!-- Column 3 (right sidebar) -->
   <script type="text/babel" src="./components/CommentsCard.jsx"></script>
+  <script type="text/babel" src="./components/CreditBureauAutomationCard.jsx"></script>
+  <script type="text/babel" src="./components/ProgramEligibilityCard.jsx"></script>
+  <script type="text/babel" src="./components/MessageTemplatesCard.jsx"></script>
+  <script type="text/babel" src="./components/ActivitiesCard.jsx"></script>
 
-  <!-- App Entry -->
+  <!-- Row 2 left panel -->
+  <script type="text/babel" src="./components/CreditBureauReportsCard.jsx"></script>
+  <script type="text/babel" src="./components/BillingNotesCard.jsx"></script>
+
+  <!-- Row 3 -->
+  <script type="text/babel" src="./components/StartedAccountsCard.jsx"></script>
+
+  <!-- Row 4 -->
+  <script type="text/babel" src="./components/TotalBalanceCard.jsx"></script>
+  <script type="text/babel" src="./components/ReferralCreditsCard.jsx"></script>
+
+  <!-- App entry — must be last -->
   <script type="text/babel" src="./main.jsx"></script>
 
 </body>

@@ -65,30 +65,36 @@ const MainWidget = () => {
         <PaymentActionsCard />
       </div>
 
-      {/* ── 3. Credit Bureau Reports ── col 1 on md+, full-width on sm */}
-      <div className="lg:col-start-1">
+      {/* ── 3. Credit Bureau Reports ── spans both cols on md+, full-width on sm */}
+      <div className="md:col-span-2 lg:col-span-2 lg:col-start-1">
         <CreditBureauReportsCard />
       </div>
 
-      {/* ── 4. Billing Notes ── col 2 on md+, full-width on sm */}
-      <div className="lg:col-start-2">
-        <BillingNotesCard />
-      </div>
-
-      {/* ── 5. Started Accounts ── spans both cols on md+, full-width on sm */}
+      {/* ── 3a. Alert Control Panel ── spans both cols on md+, full-width on sm */}
       <div className="md:col-span-2 lg:col-span-2 lg:col-start-1">
-        <StartedAccountsCard />
+        <AlertcontrolPanelCard />
       </div>
 
-      {/* ── 6. Total Balance ── col 1 on md+, full-width on sm */}
-      <div className="lg:col-start-1">
-        <TotalBalanceCard />
+      {/* ── 3b. Logins + Billing/Balance ── spans both cols on md+, full-width on sm */}
+      <div className="md:col-span-2 lg:col-span-2 lg:col-start-1">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
+          <div className="flex flex-col h-full gap-4">
+            <LogginCredentialsCard stretch />
+            <MessageTemplatesCard />
+          </div>
+          <div className="flex flex-col h-full gap-4">
+            <BillingNotesCard />
+            <TotalBalanceCard />
+              <ReferralCreditsCard />
+          </div>
+        </div>
       </div>
 
+        {/* ── 3b. Started Accounts ── spans both cols on md+, full-width on sm */}
+        <div className="md:col-span-2 lg:col-span-2 lg:col-start-1">
+          <StartedAccountsCard />
+        </div>
       {/* ── 7. Referral Credits ── col 2 on md+, full-width on sm */}
-      <div className="lg:col-start-2">
-        <ReferralCreditsCard />
-      </div>
 
       {/* ── 8. Sidebar ──────────────────────────────────────────────
            HTML order: LAST → correct stacking on sm/md
@@ -102,8 +108,8 @@ const MainWidget = () => {
         <CommentsCard />
         <CreditBureauAutomationCard />
         <ProgramEligibilityCard />
-        <MessageTemplatesCard />
         <ActivitiesCard />
+        <AccountsCountChart />
       </div>
 
     </div>

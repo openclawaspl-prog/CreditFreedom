@@ -39,8 +39,14 @@ function PaymentDetailsCard() {
     },
   ];
 
+  const [nextChargeDate, setNextChargeDate] = useState('2026-04-15');
+
+  const handleDateChange = (e) => {
+    setNextChargeDate(e.target.value);
+  };
+
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4 h-[480px] flex flex-col">
       <h2 className="text-base font-bold text-gray-900 mb-4">Payment Details</h2>
       
       <div className="space-y-4">
@@ -69,27 +75,12 @@ function PaymentDetailsCard() {
           </div>
         ))}
       </div>
-    </div>
-  );
-}
 
-/* ═══════════════════════════════════════════
-   Payment Actions Card
-═══════════════════════════════════════════ */
-function PaymentActionsCard() {
-  const [nextChargeDate, setNextChargeDate] = useState('2026-04-15');
+      <div className="border-t border-gray-200 my-4" />
 
-  const handleDateChange = (e) => {
-    setNextChargeDate(e.target.value);
-  };
-
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4 flex flex-col">
       <h2 className="text-base font-bold text-gray-900 mb-4">Payment Actions</h2>
-      
-      {/* Action Buttons */}
+
       <div className="mb-6 space-y-3">
-        {/* Top Row - Send Payment Link and Add New Card */}
         <div className="flex gap-3">
           <button className="flex-1 h-10 px-4 rounded-lg border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-semibold transition-colors">
             Send Payment Link
@@ -98,14 +89,12 @@ function PaymentActionsCard() {
             <span>+</span> Add New Card
           </button>
         </div>
-        
-        {/* Full Width - Re-run payment */}
-        <button className="w-full h-10 px-4 rounded-lg  bg-gray-900 hover:bg-gray-800 text-white text-xs font-semibold transition-colors flex items-center justify-center gap-2">
+
+        <button className="w-full h-10 px-4 rounded-lg bg-gray-900 hover:bg-gray-800 text-white text-xs font-semibold transition-colors flex items-center justify-center gap-2">
           <span>↻</span> Re-run payment
         </button>
       </div>
 
-      {/* Change Next Charge Date */}
       <div className="border-t border-gray-200 pt-4 mt-auto">
         <label className="text-sm font-medium text-gray-700 block mb-2">
           Change Next Charge Date
@@ -119,6 +108,13 @@ function PaymentActionsCard() {
       </div>
     </div>
   );
+}
+
+/* ═══════════════════════════════════════════
+   Payment Actions Card
+═══════════════════════════════════════════ */
+function PaymentActionsCard() {
+  return null;
 }
 
 window.PaymentDetailsCard = PaymentDetailsCard;

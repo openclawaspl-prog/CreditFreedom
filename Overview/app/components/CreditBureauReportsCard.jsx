@@ -1,40 +1,76 @@
-/*
-  CircleGauge — full 360° ring gauge using strokeDasharray
-  Rotated -90° so fill starts from 12-o'clock (top)
-  Circumference = 2π × r
-*/
-function CircleGauge({ score, max, color }) {
-  const r    = 38;
-  const cx   = 50;
-  const cy   = 50;
-  const circ = 2 * Math.PI * r;          // ≈ 238.8
-  const fill = (score / max) * circ;
+function SpeedometerGauge({ value, max, gradientId }) {
+  const safeValue = Math.max(0, Math.min(value, max));
+  const cx = 60;
+  const cy = 70;
+  const r = 50;
+
+  // Arc goes left to right (clockwise, sweep-flag=1)
+  const startAngle = Math.PI;        // leftmost point
+  const endAngle = 0;                // rightmost point
+  const ratio = safeValue / max;
+  const needleAngle = Math.PI + ratio * Math.PI; // left → right
+
+  function polar(a) {
+    return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+  }
+
+  const [sx, sy] = polar(startAngle);
+  const [ex, ey] = polar(endAngle);
+
+  const needleLen = r - 10;
+  const nx = cx + needleLen * Math.cos(needleAngle);
+  const ny = cy + needleLen * Math.sin(needleAngle);
 
   return (
-    <svg viewBox="0 0 100 100" style={{ width: '100%', height: 'auto' }}>
-      {/* Gray track — full ring */}
-      <circle
-        cx={cx} cy={cy} r={r}
-        fill="none" stroke="#f3f4f6" strokeWidth="9"
-      />
-      {/* Coloured progress arc — starts at top */}
-      <circle
-        cx={cx} cy={cy} r={r}
-        fill="none" stroke={color} strokeWidth="9"
+    <svg viewBox="0 0 120 100" style={{ width: '100%', height: 'auto' }} aria-hidden="true">
+      <defs>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#22c55e" />
+          <stop offset="55%" stopColor="#f59e0b" />
+          <stop offset="100%" stopColor="#ef4444" />
+        </linearGradient>
+      </defs>
+
+      {/* Track arc — clockwise (sweep-flag=1) */}
+      <path
+        d={`M ${sx} ${sy} A ${r} ${r} 0 0 1 ${ex} ${ey}`}
+        fill="none"
+        stroke="#e5e7eb"
+        strokeWidth="10"
         strokeLinecap="round"
-        strokeDasharray={`${fill} ${circ}`}
-        transform={`rotate(-90 ${cx} ${cy})`}
       />
-      {/* Score + /max on same baseline, centred in ring */}
-      <text x={cx} y={cy + 5} textAnchor="middle">
-        <tspan fontSize="14" fontWeight="700" fill="#111827">{score}</tspan>
+
+      {/* Gradient arc — clockwise (sweep-flag=1) */}
+      <path
+        d={`M ${sx} ${sy} A ${r} ${r} 0 0 1 ${ex} ${ey}`}
+        fill="none"
+        stroke={`url(#${gradientId})`}
+        strokeWidth="10"
+        strokeLinecap="round"
+      />
+
+      {/* Needle */}
+      <line
+        x1={cx}
+        y1={cy}
+        x2={nx}
+        y2={ny}
+        stroke="#ef4444"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <circle cx={cx} cy={cy} r="3.5" fill="#111827" />
+
+      {/* Value */}
+      <text x={cx} y={cy + 20} textAnchor="middle">
+        <tspan fontSize="12" fontWeight="700" fill="#111827">{safeValue}</tspan>
         <tspan fontSize="9" fill="#9ca3af">/{max}</tspan>
       </text>
     </svg>
   );
 }
 
-function BureauCol({ name, score, color, progress, delta }) {
+function BureauCol({ name, score, color, progress, delta, gaugeId }) {
   const positive = delta >= 0;
   return (
     <div className="flex-1 min-w-0">
@@ -47,26 +83,21 @@ function BureauCol({ name, score, color, progress, delta }) {
         </span>
       </div>
 
-      {/* Ring gauge */}
-      <CircleGauge score={score} max={850} color={color} />
+      {/* Speedometer gauge */}
+      <SpeedometerGauge value={score} max={850} gradientId={gaugeId} />
 
-      {/* Progress bar */}
+      {/* Progress + delta */}
       <div className="mt-2">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] text-gray-500">Progress</span>
-          <span className="text-[10px] font-bold text-gray-700">{progress}%</span>
+        <div className="flex items-center justify-between text-[10px]">
+          <span className="text-gray-500">Progress</span>
+          <span className="font-bold text-gray-700">{progress}%</span>
         </div>
-        <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
-          <div className="h-full rounded-full" style={{ width: `${progress}%`, backgroundColor: color }} />
+        <div className="flex items-center justify-between text-[10px] mt-1">
+          <span className="text-gray-400">This month</span>
+          <span className={`font-semibold ${positive ? 'text-green-600' : 'text-red-500'}`}>
+            {positive ? '+' : ''}{delta} pts
+          </span>
         </div>
-      </div>
-
-      {/* Delta row */}
-      <div className="flex items-center justify-between mt-1.5">
-        <span className={`text-[10px] font-semibold whitespace-nowrap ${positive ? 'text-green-600' : 'text-red-500'}`}>
-          {positive ? '+' : ''}{delta} points
-        </span>
-        <span className="text-[10px] text-gray-400 whitespace-nowrap">this month</span>
       </div>
 
     </div>
@@ -83,14 +114,9 @@ function CreditBureauReportsCard() {
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4">
       <h2 className="text-base font-bold text-gray-900 mb-4">Credit Bureau Reports</h2>
-      <div className="flex gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {bureaus.map((b, i) => (
-          <React.Fragment key={b.name}>
-            <BureauCol {...b} />
-            {i < bureaus.length - 1 && (
-              <div className="w-px self-stretch bg-gray-100 flex-shrink-0" />
-            )}
-          </React.Fragment>
+          <BureauCol key={b.name} {...b} gaugeId={`gauge-${i}`} />
         ))}
       </div>
     </div>

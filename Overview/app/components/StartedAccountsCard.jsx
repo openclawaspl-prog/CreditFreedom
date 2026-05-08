@@ -20,6 +20,8 @@ function TrashIcon() {
 
 function StartedAccountsCard() {
   const [accounts, setAccounts] = useAccountsState(MOCK_ACCOUNTS);
+  const MAX_VISIBLE = 5;
+  const needsScroll = accounts.length > MAX_VISIBLE;
 
   function remove(id) {
     setAccounts(prev => prev.filter(a => a.id !== id));
@@ -31,7 +33,7 @@ function StartedAccountsCard() {
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4">
       <h2 className="text-base font-bold text-gray-900 mb-4">Started Accounts</h2>
 
-      <div className="overflow-x-auto">
+      <div className={`overflow-x-auto${needsScroll ? ' max-h-[260px] overflow-y-auto pr-1' : ''}`}>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-100">

@@ -34,14 +34,16 @@ function DonutRing({ value, total, color }) {
 
 function TotalBalanceCard() {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4 h-[300px] flex flex-col">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-base font-bold text-gray-900">Total Balance</h2>
         <button className="text-xs font-semibold text-gray-600 border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors whitespace-nowrap">
           Start Monthly Program
         </button>
       </div>
-      <DonutRing value={150} total={1000} color="#818cf8" />
+      <div className="flex-1 flex items-center justify-center">
+        <DonutRing value={150} total={1000} color="#818cf8" />
+      </div>
     </div>
   );
 }

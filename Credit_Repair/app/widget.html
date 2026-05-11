@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dispute Status</title>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <!-- fallback: define $ if jQuery failed to load -->
+  <script>if (typeof $ === 'undefined') { window.$ = function(){}; window.jQuery = window.$; }</script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://live.zwidgets.com/js-sdk/1.0/ZohoEmbededAppSDK.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+    html { margin: 0; padding: 0; }
+    body { margin: 0; padding: 12px; background: #f1f3f5; font-family: Inter, system-ui, sans-serif; }
+    @media (min-width: 768px)  { body { padding: 16px; } }
+    @media (min-width: 1024px) { body { padding: 20px; } }
+  </style>
+</head>
+<body>
+
+  <div id="root"></div>
+
+  <script type="text/babel" src="./components/ActionButtonsBar.jsx"></script>
+  <script type="text/babel" src="./components/ClientHeaderCard.jsx"></script>
+  <script type="text/babel" src="./components/CreditScoresCard.jsx"></script>
+  <script type="text/babel" src="./components/DisputeStatusTable.jsx"></script>
+  <script type="text/babel" src="./components/AccountsDetailTable.jsx"></script>
+  <script type="text/babel" src="./main.jsx"></script>
+
+</body>
+</html>

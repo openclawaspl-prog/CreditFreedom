@@ -16,7 +16,7 @@ process.env.PWD = process.env.PWD || process.cwd();
 
 
 var expressApp = express();
-var port = 1000;
+var port = 5000;
 
 expressApp.set('port', port);
 expressApp.use(morgan('dev'));
@@ -49,7 +49,7 @@ var options = {
 
 https.createServer(options, expressApp).listen(port, function () {
   console.log(chalk.green('Zet running at ht' + 'tps://127.0.0.1:' + port));
-  console.log(chalk.bold.cyan("Note: Please enable the host (https://127.0.0.1:" + port + ") in a new tab and authorize the connection by clicking Advanced->Proceed to 127.0.0.1 (unsafe)."));
+  console.log(chalk.bold.cyan("Note: Please enable the host (https://127.0.0.1:"+port+") in a new tab and authorize the connection by clicking Advanced->Proceed to 127.0.0.1 (unsafe)."));
 }).on('error', function (err) {
   if (err.code === 'EADDRINUSE') {
     console.log(chalk.bold.red(port + " port is already in use"));

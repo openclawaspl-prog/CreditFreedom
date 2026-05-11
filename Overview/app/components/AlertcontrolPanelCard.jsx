@@ -22,6 +22,7 @@ const FIELD_DEFS = [
   { label: 'Free CrediScore Login', api: 'Free_CrediScore_Login' },
   { label: 'KOVO', api: 'KOVO' },
   { label: 'Unsecure Credit Card', api: 'Unsecure_Credit_Card' },
+  { label: 'Name Alert', api: 'Name_Alert' },
 ];
 
 function toBool(value) {

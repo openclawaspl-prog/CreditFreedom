@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 
+// Entry used by index.html and bundled by Vite.
 // 6 color palette that repeats
 const colors = [
   'linear-gradient(135deg, #eef4ff 0%, #f6f8ff 100%)',
@@ -74,8 +75,9 @@ const getPageRecordId = (data) => {
 const getContactLookupValue = (recordId) => ({ id: recordId });
 
 const MAX_FIELD_LENGTH = 40;
+const MIN_USERNAME_LENGTH = 5;
 const NAME_REGEX = /^[A-Za-z0-9.@#$ ]+$/;
-const EMAIL_REGEX = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+const USERNAME_REGEX = /^[A-Za-z0-9.@#$]+$/;
 const PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d).{8,40}$/;
 
 function DetailRow({ label, value }) {
@@ -168,7 +170,7 @@ function MonitoringModal({ isOpen, onClose, onSave, editingCard }) {
   const validateForm = () => {
     const nextErrors = {};
     const trimmedName = formData.Name1.trim();
-    const trimmedEmail = formData.Name.trim();
+    const trimmedUserName = formData.Name.trim();
     const trimmedPassword = formData.Password.trim();
     const trimmedNote = formData.Note.trim();
 
@@ -180,12 +182,14 @@ function MonitoringModal({ isOpen, onClose, onSave, editingCard }) {
       nextErrors.Name1 = 'Only letters, numbers, space, ., $, @, # are allowed.';
     }
 
-    if (!trimmedEmail) {
-      nextErrors.Name = 'Email is required.';
-    } else if (trimmedEmail.length > MAX_FIELD_LENGTH) {
-      nextErrors.Name = `Email must be ${MAX_FIELD_LENGTH} characters or less.`;
-    } else if (!EMAIL_REGEX.test(trimmedEmail)) {
-      nextErrors.Name = 'Enter a valid email address.';
+    if (!trimmedUserName) {
+      nextErrors.Name = 'User name is required.';
+    } else if (trimmedUserName.length < MIN_USERNAME_LENGTH) {
+      nextErrors.Name = `User name must be at least ${MIN_USERNAME_LENGTH} characters.`;
+    } else if (trimmedUserName.length > MAX_FIELD_LENGTH) {
+      nextErrors.Name = `User name must be ${MAX_FIELD_LENGTH} characters or less.`;
+    } else if (!USERNAME_REGEX.test(trimmedUserName)) {
+      nextErrors.Name = 'Only letters, numbers, ., @, $, # are allowed.';
     }
 
     if (!trimmedPassword) {
@@ -252,7 +256,7 @@ function MonitoringModal({ isOpen, onClose, onSave, editingCard }) {
               name="Name"
               value={formData.Name}
               onChange={handleChange}
-              placeholder="e.g., johndoe@email.com"
+              placeholder="e.g., john.1"
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-slate-900"
               maxLength={MAX_FIELD_LENGTH}
             />

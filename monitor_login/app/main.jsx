@@ -1,3 +1,4 @@
+// Entry used by widget.html with React/ReactDOM loaded from CDN globals.
 const { useState, useEffect } = React;
 
 // 6 color palette that repeats
@@ -73,8 +74,9 @@ const getPageRecordId = (data) => {
 const getContactLookupValue = (recordId) => ({ id: recordId });
 
 const MAX_FIELD_LENGTH = 40;
+const MIN_USERNAME_LENGTH = 5;
 const NAME_REGEX = /^[A-Za-z0-9.@#$ ]+$/;
-const EMAIL_REGEX = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+const USERNAME_REGEX = /^[A-Za-z0-9.@#$]+$/;
 const PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d).{8,40}$/;
 
 function DetailRow({ label, value }) {
@@ -93,7 +95,7 @@ function CredentialCard({ card, index, onEdit, onDelete }) {
       style={{ background: colors[index % colors.length] }}
     >
       {/* Edit and Delete buttons - visible on hover */}
-      <div className="absolute top-4 right-4 z-20 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-auto">
+      <div className="absolute top-4 right-4 z-20 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <button
           onClick={() => onEdit(card)}
           className="flex items-center justify-center w-8 h-8 rounded-lg bg-white/70 hover:bg-white text-slate-700 hover:text-slate-900 transition-all duration-150 shadow-sm hover:shadow-md"
@@ -119,7 +121,7 @@ function CredentialCard({ card, index, onEdit, onDelete }) {
       </div>
 
       <div className="relative z-10 flex h-full flex-col">
-        <div className="flex items-start justify-between gap-4 pr-12">
+        <div className="flex items-start justify-between gap-4 pr-16">
           <div className="flex-1 min-w-0">
             <h2 className="card-title text-[1.35rem] font-bold text-slate-900 break-all whitespace-normal">
               {card.Name1}
@@ -127,7 +129,7 @@ function CredentialCard({ card, index, onEdit, onDelete }) {
           </div>
         </div>
 
-        <div className="mt-6 rounded-2xl p-4 backdrop-blur-sm">
+        <div className="mt-6 rounded-2xl bg-white/55 p-4 backdrop-blur-sm">
           <DetailRow label="User Name" value={card.Name} />
           <DetailRow label="Password" value={card.Password} />
           <DetailRow label="Note" value={card.Note} />
@@ -146,6 +148,7 @@ function MonitoringModal({ isOpen, onClose, onSave, editingCard }) {
   });
   const [errors, setErrors] = useState({});
 
+  // Update form when editingCard changes
   React.useEffect(() => {
     if (editingCard) {
       setFormData(editingCard);
@@ -166,7 +169,7 @@ function MonitoringModal({ isOpen, onClose, onSave, editingCard }) {
   const validateForm = () => {
     const nextErrors = {};
     const trimmedName = formData.Name1.trim();
-    const trimmedEmail = formData.Name.trim();
+    const trimmedUserName = formData.Name.trim();
     const trimmedPassword = formData.Password.trim();
     const trimmedNote = formData.Note.trim();
 
@@ -178,12 +181,14 @@ function MonitoringModal({ isOpen, onClose, onSave, editingCard }) {
       nextErrors.Name1 = 'Only letters, numbers, space, ., $, @, # are allowed.';
     }
 
-    if (!trimmedEmail) {
-      nextErrors.Name = 'Email is required.';
-    } else if (trimmedEmail.length > MAX_FIELD_LENGTH) {
-      nextErrors.Name = `Email must be ${MAX_FIELD_LENGTH} characters or less.`;
-    } else if (!EMAIL_REGEX.test(trimmedEmail)) {
-      nextErrors.Name = 'Enter a valid email address.';
+    if (!trimmedUserName) {
+      nextErrors.Name = 'User name is required.';
+    } else if (trimmedUserName.length < MIN_USERNAME_LENGTH) {
+      nextErrors.Name = `User name must be at least ${MIN_USERNAME_LENGTH} characters.`;
+    } else if (trimmedUserName.length > MAX_FIELD_LENGTH) {
+      nextErrors.Name = `User name must be ${MAX_FIELD_LENGTH} characters or less.`;
+    } else if (!USERNAME_REGEX.test(trimmedUserName)) {
+      nextErrors.Name = 'Only letters, numbers, ., @, $, # are allowed.';
     }
 
     if (!trimmedPassword) {
@@ -250,7 +255,7 @@ function MonitoringModal({ isOpen, onClose, onSave, editingCard }) {
               name="Name"
               value={formData.Name}
               onChange={handleChange}
-              placeholder="e.g., johndoe@email.com"
+              placeholder="e.g., john.1"
               className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-slate-900"
               maxLength={MAX_FIELD_LENGTH}
             />
@@ -351,6 +356,7 @@ function App() {
           Note: record.Note || '',
         }));
         setCards(mapped);
+        console.log('Fetched records:', mapped);
       })
       .catch((err) => {
         console.error('Failed to load Monitoring Log In records:', err);
@@ -467,9 +473,15 @@ function App() {
       <div className="mx-auto flex min-h-[calc(100vh-48px)] w-full max-w-[1600px] flex-col gap-6">
         <div className="glass-panel rounded-[28px] px-6 py-6">
           <div className="flex flex-col gap-4 pb-4 sm:flex-row sm:items-center sm:justify-between">
-            <h1 className="page-title text-3xl font-bold text-slate-900 sm:text-4xl">
-              Log In Credentials
-            </h1>
+            <div>
+              <h1 className="page-title text-3xl font-bold text-slate-900 sm:text-4xl">
+                Monitoring Log In
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
+                A card-based login monitoring dashboard for the <span className="font-semibold text-slate-800">Monitoring Log-In</span> module.
+                Replace the sample values with live API data when you provide the field mappings.
+              </p>
+            </div>
             <button
               onClick={handleOpenAddModal}
               type="button"
@@ -504,7 +516,7 @@ function App() {
         </div>
       </div>
 
-      <MonitoringModal
+      <MonitoringModal 
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         onSave={handleSaveCard}

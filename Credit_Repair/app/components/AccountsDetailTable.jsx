@@ -369,7 +369,7 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveField }) {
 }
 
 /* ─── Main exported component ─── */
-function AccountsDetailTable({ contactId, accounts: propAccounts }) {
+function AccountsDetailTable({ contactId, accounts: propAccounts, entityName }) {
   const [accounts, setAccounts] = useDtState(propAccounts || []);
 
   useDtEffect(() => {
@@ -379,10 +379,11 @@ function AccountsDetailTable({ contactId, accounts: propAccounts }) {
   /* Re-fetch after a mutation */
   function refresh() {
     if (!contactId) return;
+    const entity = entityName || 'Contacts';
     ZOHO.CRM.API.searchRecords({
       Entity:   'Client_Account',
       Type:     'criteria',
-      Query:    '(Contact_Name:equals:' + contactId + ')',
+      Query:    '(Client_ID:equals:' + contactId + ')',
       page:     1,
       per_page: 200,
     })

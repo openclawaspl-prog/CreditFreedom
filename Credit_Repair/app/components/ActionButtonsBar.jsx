@@ -66,19 +66,20 @@ const DropItem = ({ onClick, children }) => (
   </button>
 );
 
-function ActionButtonsBar({ contactId }) {
+function ActionButtonsBar({ contactId, entity }) {
+  const targetEntity = entity || 'Contacts';
 
   function handleSendTextMessage() {
     /* TODO: wire up to your SMS provider / Zoho telephony API */
     if (window.ZOHO && ZOHO.CRM && ZOHO.CRM.UI) {
-      ZOHO.CRM.UI.Record.open({ Entity: 'Contacts', RecordID: contactId });
+      ZOHO.CRM.UI.Record.open({ Entity: targetEntity, RecordID: contactId });
     }
   }
 
   function handleSendMail() {
     if (window.ZOHO && ZOHO.CRM && ZOHO.CRM.UI) {
       ZOHO.CRM.UI.Record.sendMail &&
-        ZOHO.CRM.UI.Record.sendMail({ Entity: 'Contacts', RecordID: contactId });
+        ZOHO.CRM.UI.Record.sendMail({ Entity: targetEntity, RecordID: contactId });
     }
   }
 
@@ -107,7 +108,7 @@ function ActionButtonsBar({ contactId }) {
               close();
               ZOHO.CRM.API.getRelatedRecords &&
                 ZOHO.CRM.API.getRelatedRecords({
-                  Entity: 'Contacts', RecordID: contactId,
+                  Entity: targetEntity, RecordID: contactId,
                   RelatedList: 'Deals', page: 1, per_page: 10,
                 }).then(r => {
                   if (r && r.data && r.data[0])
@@ -141,7 +142,7 @@ function ActionButtonsBar({ contactId }) {
             <DropItem onClick={() => {
               close();
               ZOHO.CRM.UI.Record.open &&
-                ZOHO.CRM.UI.Record.open({ Entity: 'Contacts', RecordID: contactId });
+                ZOHO.CRM.UI.Record.open({ Entity: targetEntity, RecordID: contactId });
             }}>Open Record</DropItem>
           </>
         )}

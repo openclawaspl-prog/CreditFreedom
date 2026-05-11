@@ -1,63 +1,134 @@
 /*
-  DisputeStatus widget — main entry
-  Two API calls in parallel:
-    1. getRecord         → Contact fields (scores, header info)
-    2. getRelatedRecords → Client_Account related list (dispute counts)
-  Stale-while-revalidate cache (localStorage, 30-min TTL).
-  Delta check via Contact's Modified_Time.
+  DisputeStatus widget - main entry
+  Fetches Contact and Client_Account data, then passes them to child components.
 */
 const { useState, useEffect } = React;
 
-const CACHE_NS  = 'cf_ds_';
-const CACHE_TTL = 30 * 60 * 1000;
+const LOAD_TIMEOUT_MS = 20000;
 
-function cacheRead(id) {
-  try {
-    const raw = localStorage.getItem(CACHE_NS + id);
-    if (!raw) return null;
-    const { ts, payload } = JSON.parse(raw);
-    return Date.now() - ts > CACHE_TTL ? null : payload;
-  } catch { return null; }
+function withTimeout(promise, ms, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(label + ' timed out')), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
-function cacheWrite(id, payload) {
-  try {
-    localStorage.setItem(CACHE_NS + id, JSON.stringify({ ts: Date.now(), payload }));
-  } catch {}
+function extractZohoError(resp) {
+  const data0 = resp && resp.data && resp.data[0];
+  if (data0 && data0.status === 'error') return data0;
+  if (resp && resp.status === 'error') return resp;
+  return null;
 }
 
-/* Slim down the Contact record — only fields we render */
+function formatZohoError(err) {
+  if (!err) return 'Unknown error.';
+  if (typeof err === 'string') return err;
+  if (err.code || err.message || err.details) {
+    const parts = [];
+    if (err.code) parts.push(String(err.code));
+    if (err.message) parts.push(String(err.message));
+    if (err.details) {
+      try { parts.push(JSON.stringify(err.details)); } catch {}
+    }
+    return parts.join(' | ') || 'Unknown error.';
+  }
+  try { return JSON.stringify(err); } catch { return 'Unknown error.'; }
+}
+
+function normalizeEntityId(rawId) {
+  let val = rawId;
+  if (Array.isArray(val)) val = val[0];
+  if (val && typeof val === 'object') {
+    val = val.id || val.ID || val.record_id || val.RecordID || '';
+  }
+  if (val == null) return '';
+  return String(val).trim();
+}
+
+function getPageEntityId(pageData) {
+  if (!pageData) return '';
+  const candidates = [
+    pageData.EntityId,
+    pageData.EntityID,
+    pageData.entityId,
+    pageData.entityID,
+    pageData.EntityIds,
+    pageData.EntityIDs,
+  ];
+  for (const c of candidates) {
+    const id = normalizeEntityId(c);
+    if (id) return id;
+  }
+  return '';
+}
+
+function waitForZohoSdk(timeoutMs = 8000) {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    function tick() {
+      if (window.ZOHO && window.ZOHO.embeddedApp) return resolve(window.ZOHO);
+      if (Date.now() - start > timeoutMs) return reject(new Error('ZOHO SDK not ready'));
+      setTimeout(tick, 100);
+    }
+    tick();
+  });
+}
+
+function waitForCrmApi(zoho, timeoutMs = 8000) {
+  return new Promise((resolve) => {
+    const start = Date.now();
+    function tick() {
+      if (zoho && zoho.CRM && zoho.CRM.API) return resolve(true);
+      if (Date.now() - start > timeoutMs) return resolve(false);
+      setTimeout(tick, 100);
+    }
+    tick();
+  });
+}
+
+async function resolveContactId(zoho, sourceEntity, sourceId) {
+  if (sourceEntity === 'Contacts') return sourceId;
+  if (!sourceId) return '';
+
+  try {
+    const resp = await withTimeout(
+      zoho.CRM.API.getRecord({ Entity: sourceEntity, RecordID: sourceId }),
+      LOAD_TIMEOUT_MS,
+      'getRecord:source'
+    );
+    const err = extractZohoError(resp);
+    if (err) throw err;
+    const rec = resp && resp.data && resp.data[0];
+    const lookup = rec && (
+      rec.Client_ID || rec.Client || rec.Contact || rec.Contact_Name || rec.Client_Name
+    );
+    return normalizeEntityId(lookup);
+  } catch (err) {
+    console.error('[CF] resolveContactId error:', formatZohoError(err));
+    return '';
+  }
+}
+
 function pickContact(r) {
   return {
     Full_Name:        r.Full_Name        || '',
     Email:            r.Email            || '',
-    /* "Referred By" lookup — API field name confirmed as Name1 */
-    Referred_By:      r.Name1            || '—',
+    Referred_By:      r.Name1            || '-',
     Client_Status:    r.Client_Status    || 'Client',
-    /* Credit scores (max 900) */
     Equifax_Score:    Number(r.Equifax_Score)    || 0,
-    Experin_Score:    Number(r.Experin_Score)    || 0,   // "Experin" as confirmed
+    Experin_Score:    Number(r.Experin_Score)    || 0,
     Transunion_Score: Number(r.Transunion_Score) || 0,
-    /* Monthly deltas — add field API names here once created in Zoho */
     Equifax_Delta:    Number(r.Equifax_Delta)    || 0,
     Experian_Delta:   Number(r.Experian_Delta)   || 0,
     Transunion_Delta: Number(r.Transunion_Delta) || 0,
-    Modified_Time:    r.Modified_Time            || '',
+    Modified_Time:    r.Modified_Time           || '',
   };
 }
 
-/*
-  Build dispute counts from Client_Account related records.
-  Each record has:
-    block_type : 'late'|'new'|'start'|'charged'|'closed'|'account_change'|'removed'
-    Bureau     : 'Equifax'|'TransUnion'|'Experian'
-                 ↑ TODO: replace 'Bureau' with the actual field API name in Client_Account
-  Returns: { Equifax: { late: N, new: N, … }, TransUnion: {…}, Experian: {…} }
-*/
 const BLOCK_TYPES = ['late', 'new', 'start', 'charged', 'closed', 'account_change', 'removed'];
-const BUREAUS     = ['Equifax', 'TransUnion', 'Experian'];
+const BUREAUS = ['Equifax', 'TransUnion', 'Experian'];
 
-/* Unwrap Zoho field — picklist returns string, lookup returns { display_value, name, id } */
 function zohoStr(val) {
   if (!val) return '';
   if (typeof val === 'object') return val.display_value || val.name || val.value || '';
@@ -66,9 +137,9 @@ function zohoStr(val) {
 
 function normalizeBureau(val) {
   const s = zohoStr(val).trim().toLowerCase().replace(/[\s_-]/g, '');
-  if (s === 'equifax')    return 'Equifax';
+  if (s === 'equifax') return 'Equifax';
   if (s === 'transunion') return 'TransUnion';
-  if (s === 'experian')   return 'Experian';
+  if (s === 'experian') return 'Experian';
   return '';
 }
 
@@ -80,9 +151,12 @@ function buildCounts(accounts) {
   });
 
   (accounts || []).forEach(acc => {
-    console.log('[CF] acc.Creditor =', acc.Creditor, '| acc.block_type =', acc.block_type);
-    const bureau = normalizeBureau(acc.Creditor);
-    const type   = zohoStr(acc.block_type).trim().toLowerCase();
+    const bureau = normalizeBureau(
+      acc.Creditor || acc.Bureau || acc.Credit_Bureau || acc.CreditBureau || acc.Creditor_Name
+    );
+    const type = zohoStr(
+      acc.block_type || acc.Block_Type || acc.BlockType || acc.Block || acc.Blocktype
+    ).trim().toLowerCase();
     if (bureau && counts[bureau] && counts[bureau][type] !== undefined) {
       counts[bureau][type]++;
     }
@@ -91,7 +165,6 @@ function buildCounts(accounts) {
   return counts;
 }
 
-/* Resize iframe to fit content */
 function useDynamicHeight() {
   useEffect(() => {
     let timer;
@@ -111,14 +184,13 @@ function useDynamicHeight() {
   }, []);
 }
 
-/* Loading skeleton */
 function Skeleton() {
   const Bar = ({ cls }) => <div className={`h-3 bg-blue-300 rounded animate-pulse ${cls}`} />;
   return (
     <div className="space-y-4">
       <div className="rounded-xl px-6 py-5" style={{ background: '#1d4ed8' }}>
         <div className="grid grid-cols-2 gap-x-12 gap-y-4">
-          {[1,2,3,4].map(i => (
+          {[1, 2, 3, 4].map(i => (
             <div key={i} className="space-y-2">
               <Bar cls="w-16 opacity-60" />
               <Bar cls="w-28" />
@@ -134,77 +206,169 @@ function Skeleton() {
   );
 }
 
+async function fetchContact(zoho, entity, idStr) {
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const resp = await withTimeout(
+        zoho.CRM.API.getRecord({ Entity: entity, RecordID: idStr }),
+        LOAD_TIMEOUT_MS,
+        'getRecord'
+      );
+      const err = extractZohoError(resp);
+      if (err) throw err;
+      return resp && resp.data && resp.data[0] ? resp.data[0] : null;
+    } catch (err) {
+      if (attempt >= 2) {
+        console.error('[CF] getRecord error:', formatZohoError(err));
+        return null;
+      }
+      await new Promise(r => setTimeout(r, 400));
+    }
+  }
+  return null;
+}
+
+async function fetchAccounts(zoho, entity, idStr) {
+  if (entity !== 'Contacts') return [];
+  const api = zoho && zoho.CRM && zoho.CRM.API;
+  if (!api || !api.searchRecord) return [];
+
+  const criteria = '(Client_ID:equals:' + idStr + ')';
+  const perPage = 200;
+  const all = [];
+
+  try {
+    for (let page = 1; page <= 5; page++) {
+      const resp = await withTimeout(
+        api.searchRecord({
+          Entity: 'Client_Account',
+          Type: 'criteria',
+          Query: criteria,
+          page,
+          per_page: perPage,
+        }),
+        LOAD_TIMEOUT_MS,
+        'searchRecord'
+      );
+      const err = extractZohoError(resp);
+      if (err) throw err;
+      const data = (resp && resp.data) || [];
+      all.push(...data);
+
+      const more = resp && resp.info && resp.info.more_records;
+      if (!more && data.length < perPage) break;
+      if (data.length < perPage) break;
+    }
+  } catch (err) {
+    console.error('[CF] searchRecord error:', formatZohoError(err));
+  }
+
+  return all;
+}
+
 const DisputeWidget = () => {
-  const [contact,  setContact]  = useState(null);
-  const [counts,   setCounts]   = useState(null);
+  const [contact, setContact] = useState(null);
   const [accounts, setAccounts] = useState([]);
-  const [contactId, setContactId] = useState(null);
-  const [loading,  setLoading]  = useState(true);
+  const [counts, setCounts] = useState(buildCounts([]));
+  const [contactId, setContactId] = useState('');
+  const [entityName, setEntityName] = useState('Contacts');
+  const [loading, setLoading] = useState(true);
+
   useDynamicHeight();
 
   useEffect(() => {
-    /* One-time: log all related list API names on Contacts so we pick the right one */
-    ZOHO.CRM.META.getRelatedLists({ Entity: 'Contacts' })
-      .then(data => console.log('[CF] Contacts related lists:', JSON.stringify(data)))
-      .catch(e => console.error('[CF] META error:', e));
+    let alive = true;
+    let pageLoadFired = false;
+    let pageLoadTimer;
 
-    console.log('[CF] registering PageLoad handler');
-    ZOHO.embeddedApp.on('PageLoad', (pageData) => {
-      console.log('[CF] PageLoad fired, EntityId =', pageData && pageData.EntityId);
-      const id = pageData.EntityId;
-      setContactId(id);
+    waitForZohoSdk().then((zoho) => {
+      if (!alive) return;
 
-      /* Instant render from cache */
-      const cached = cacheRead(id);
-      if (cached) {
-        setContact(cached.contact);
-        setCounts(cached.counts);
-        setLoading(false);
-      }
+      pageLoadTimer = setTimeout(() => {
+        if (!pageLoadFired && alive) {
+          console.error('[CF] Waiting for CRM context...');
+          setContact({});
+          setCounts(buildCounts([]));
+          setAccounts([]);
+          setLoading(false);
+        }
+      }, 2000);
 
-      /* Parallel: fetch Contact + Client_Account records */
-      Promise.all([
-        ZOHO.CRM.API.getRecord({
-          Entity: 'Contacts',
-          RecordID: id,
-        }),
-        ZOHO.CRM.API.searchRecords({
-          Entity:   'Client_Account',
-          Type:     'criteria',
-          Query:    '(Contact_Name:equals:' + id + ')',
-          page:     1,
-          per_page: 200,
-        }).then(resp => {
-          console.log('[CF] searchRecords response:', JSON.stringify(resp));
-          return resp;
-        }).catch(e => {
-          console.error('[CF] searchRecords error:', e);
-          return { data: [] };
-        }),
-      ]).then(([contactResp, accountsResp]) => {
-        if (!contactResp || !contactResp.data || !contactResp.data[0]) return;
+      zoho.embeddedApp.on('PageLoad', async (pageData) => {
+        pageLoadFired = true;
+        clearTimeout(pageLoadTimer);
+        if (!alive) return;
 
-        const rawAccounts  = (accountsResp && accountsResp.data) || [];
-        const freshContact = pickContact(contactResp.data[0]);
-        const freshCounts  = buildCounts(rawAccounts);
+        const sourceEntity = (pageData && pageData.Entity) ? pageData.Entity : 'Contacts';
+        const sourceId = getPageEntityId(pageData);
 
-        setAccounts(rawAccounts);
+        const idStr = await resolveContactId(zoho, sourceEntity, sourceId);
+        const contactEntity = 'Contacts';
 
-        /* Always apply fresh counts (accounts change independently of contact) */
-        setCounts(freshCounts);
+        setContactId(idStr);
+        setEntityName(contactEntity);
+        setLoading(true);
 
-        /* Only re-render contact fields if contact record itself changed */
-        if (!cached || cached.contact.Modified_Time !== freshContact.Modified_Time) {
-          setContact(freshContact);
+        if (!idStr) {
+          console.error('[CF] Missing contact id from PageLoad:', pageData);
+          setContact({});
+          setCounts(buildCounts([]));
+          setAccounts([]);
+          setLoading(false);
+          return;
         }
 
-        /* Always write fresh counts to cache */
-        cacheWrite(id, { contact: freshContact, counts: freshCounts });
-        setLoading(false);
+        const apiReady = await waitForCrmApi(zoho);
+        if (!apiReady) {
+          console.error('[CF] CRM API not ready');
+          setContact({});
+          setCounts(buildCounts([]));
+          setAccounts([]);
+          setLoading(false);
+          return;
+        }
+
+        try {
+          console.log("Fetching acc");
+          
+          const [contactData, accountRows] = await Promise.all([
+            fetchContact(zoho, contactEntity, idStr),
+            fetchAccounts(zoho, contactEntity, idStr),
+          ]);
+
+          if (!alive) return;
+
+          const safeAccounts = Array.isArray(accountRows) ? accountRows : [];
+          const freshCounts = buildCounts(safeAccounts);
+
+          setAccounts(safeAccounts);
+          setCounts(freshCounts);
+          setContact(contactData ? pickContact(contactData) : {});
+        } catch (err) {
+          if (!alive) return;
+          console.error('[CF] data load error:', formatZohoError(err));
+          setContact({});
+          setCounts(buildCounts([]));
+          setAccounts([]);
+        } finally {
+          if (alive) setLoading(false);
+        }
       });
+
+      zoho.embeddedApp.init();
+    }).catch((err) => {
+      if (!alive) return;
+      console.error('[CF] ZOHO SDK not available:', err);
+      setContact({});
+      setCounts(buildCounts([]));
+      setAccounts([]);
+      setLoading(false);
     });
 
-    ZOHO.embeddedApp.init();
+    return () => {
+      alive = false;
+      if (pageLoadTimer) clearTimeout(pageLoadTimer);
+    };
   }, []);
 
   if (loading && !contact) return <Skeleton />;
@@ -213,8 +377,7 @@ const DisputeWidget = () => {
 
   return (
     <div className="space-y-4">
-
-      <ActionButtonsBar contactId={contactId} />
+      <ActionButtonsBar contactId={contactId} entity={entityName} />
 
       <ClientHeaderCard
         name={c.Full_Name}
@@ -223,7 +386,6 @@ const DisputeWidget = () => {
         status={c.Client_Status}
       />
 
-      {/* 3:2 ratio — gauges take the wider left column */}
       <div className="grid grid-cols-1 gap-4 items-start" style={{ gridTemplateColumns: '1fr' }}>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-start">
           <div className="lg:col-span-3">
@@ -235,8 +397,11 @@ const DisputeWidget = () => {
         </div>
       </div>
 
-      <AccountsDetailTable contactId={contactId} accounts={accounts} />
-
+      <AccountsDetailTable
+        contactId={contactId}
+        accounts={accounts}
+        entityName={entityName}
+      />
     </div>
   );
 };

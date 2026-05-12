@@ -106,14 +106,6 @@ function ActionButtonsBar({ contactId, entity }) {
           <>
             <DropItem onClick={() => {
               close();
-              ZOHO.CRM.API.getRelatedRecords &&
-                ZOHO.CRM.API.getRelatedRecords({
-                  Entity: targetEntity, RecordID: contactId,
-                  RelatedList: 'Deals', page: 1, per_page: 10,
-                }).then(r => {
-                  if (r && r.data && r.data[0])
-                    ZOHO.CRM.UI.Record.open({ Entity: 'Deals', RecordID: r.data[0].id });
-                }).catch(() => {});
             }}>View Contract</DropItem>
             <DropItem onClick={() => {
               close();

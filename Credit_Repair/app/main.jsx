@@ -4,7 +4,7 @@
 */
 const { useState, useEffect } = React;
 
-const LOAD_TIMEOUT_MS = 20000;
+const LOAD_TIMEOUT_MS = 30000;
 
 function withTimeout(promise, ms, label) {
   let timer;
@@ -231,36 +231,45 @@ async function fetchContact(zoho, entity, idStr) {
 async function fetchAccounts(zoho, entity, idStr) {
   if (entity !== 'Contacts') return [];
   const api = zoho && zoho.CRM && zoho.CRM.API;
-  if (!api || !api.searchRecord) return [];
+  if (!api || !api.getAllRecords) return [];
 
-  const criteria = '(Client_ID:equals:' + idStr + ')';
-  const perPage = 200;
+  const perPage = 100;
   const all = [];
 
   try {
-    for (let page = 1; page <= 5; page++) {
+    for (let page = 1; page <= 10; page++) {
       const resp = await withTimeout(
-        api.searchRecord({
+        api.getAllRecords({
           Entity: 'Client_Account',
-          Type: 'criteria',
-          Query: criteria,
           page,
           per_page: perPage,
         }),
         LOAD_TIMEOUT_MS,
-        'searchRecord'
+        'getAllRecords'
       );
       const err = extractZohoError(resp);
       if (err) throw err;
       const data = (resp && resp.data) || [];
       all.push(...data);
 
+      if (page === 1) {
+        data.slice(0, 5).forEach(row => {
+          
+          const reason = row.Reason;
+          const remarks = row.Remarks;
+          const instruction = row.Instruction;
+          console.log('[CF] Client_Account Reason:', reason, '| Name:', reason && reason.name);
+          console.log('[CF] Client_Account Remarks:', remarks);
+          console.log('[CF] Client_Account Instruction:', instruction, '| Name:', instruction && instruction.name);
+        });
+      }
+
       const more = resp && resp.info && resp.info.more_records;
       if (!more && data.length < perPage) break;
       if (data.length < perPage) break;
     }
   } catch (err) {
-    console.error('[CF] searchRecord error:', formatZohoError(err));
+    console.error('[CF] getAllRecords error:', formatZohoError(err));
   }
 
   return all;

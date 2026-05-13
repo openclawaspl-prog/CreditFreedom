@@ -858,7 +858,7 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
           }
 
           .cf-account-section tbody td {
-            border-bottom: 1px solid #eef2f7;
+            border-bottom: 1px solid #d1d5db;
           }
 
           .cf-account-section {
@@ -868,18 +868,33 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
           }
 
           .cf-account-section thead th {
-            background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%) !important;
-            color: #5b6472 !important;
+            background: #ffffff !important;
+            color: #000000 !important;
             font-size: 11px;
             font-weight: 700 !important;
             letter-spacing: 0.08em;
             text-transform: uppercase;
             border-bottom: 1px solid #e6edf5 !important;
+            border-top: none !important;
+            position: sticky;
+            top: 0;
+            z-index: 5;
+          }
+
+          .cf-account-section thead {
+            border-top: none !important;
           }
 
           .cf-account-section th,
           .cf-account-section td {
-            border-color: transparent !important;
+            border-right: 1px solid #d1d5db;
+            border-color: #d1d5db !important;
+            text-align: center;
+          }
+
+          .cf-account-section th:last-child,
+          .cf-account-section td:last-child {
+            border-right: none;
           }
 
           .cf-account-section thead th {
@@ -962,7 +977,7 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
       <div
         className="px-4 py-3 border-b flex items-center justify-between rounded-t-xl"
         style={{
-          background: 'linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,250,252,0.90))',
+          background: '#ffffff',
           borderColor: '#e5e7eb',
         }}
       >
@@ -1056,7 +1071,7 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
           style={{
             overflowX: 'auto',
             overflowY: 'auto',
-            background: 'linear-gradient(180deg, rgba(255,255,255,0.92), rgba(248,250,252,0.76))',
+            background: '#ffffff',
             maxHeight: 'calc(var(--cf-head-h) + (var(--cf-row-h) * 5))',
             borderBottomLeftRadius: '0.75rem',
             borderBottomRightRadius: '0.75rem',
@@ -1230,7 +1245,7 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
                 </td>
 
                 {/* Balance */}
-                <td className="px-4 py-3 text-left whitespace-nowrap" style={{ color: '#111827', fontWeight: 600, width: '13ch', minWidth: '13ch', maxWidth: '13ch', boxSizing: 'border-box', overflow: 'hidden' }}>
+                <td className="px-4 py-3 text-left whitespace-nowrap" style={{ color: '#111827', fontWeight: 600, width: '14ch', minWidth: '14ch', maxWidth: '14ch', boxSizing: 'border-box', overflow: 'hidden', paddingRight: '2rem' }}>
                   {(() => {
                     const balanceText = dtFmtBalance(row[F.balance]);
                     const balanceDigits = String(row[F.balance] ?? '').replace(/[^\d]/g, '').slice(0, 10);
@@ -1240,7 +1255,7 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
                         title={balanceText}
                         style={{
                           display: 'inline-block',
-                          maxWidth: '11ch',
+                          maxWidth: '12ch',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',

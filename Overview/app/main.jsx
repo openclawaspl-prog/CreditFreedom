@@ -97,35 +97,86 @@ function useZohoPageLoadBridge() {
 function useDynamicHeight() {
   useResizeEffect(() => {
     let timer;
+    const settleTimers = [];
+    let readyTimer;
+
+    function measureHeight() {
+      const root = document.getElementById('root');
+      const content = document.getElementById('overview-content') || root;
+      if (!root || !content) return;
+
+      const bodyStyle = window.getComputedStyle(document.body);
+      const paddingTop = parseFloat(bodyStyle.paddingTop || 0);
+      const paddingBottom = parseFloat(bodyStyle.paddingBottom || 0);
+
+      const rootRect = root.getBoundingClientRect();
+      const contentRect = content.getBoundingClientRect();
+      const measuredRootHeight = Math.max(
+        root.scrollHeight,
+        root.offsetHeight,
+        rootRect.height
+      );
+      const measuredContentHeight = Math.max(
+        content.scrollHeight,
+        content.offsetHeight,
+        contentRect.height
+      );
+      const measured = Math.max(measuredRootHeight, measuredContentHeight);
+      const h = Math.ceil(measured + paddingTop + paddingBottom + 40);
+
+      if (window.ZOHO && window.ZOHO.CRM && window.ZOHO.CRM.UI && window.ZOHO.CRM.UI.Resize) {
+        window.ZOHO.CRM.UI.Resize({ height: String(h), width: '0' });
+      }
+    }
 
     function sendResize() {
       clearTimeout(timer);
-      timer = setTimeout(() => {
-        const root = document.getElementById('root');
-        if (!root) return;
+      timer = setTimeout(measureHeight, 150);
+    }
 
-        const bodyStyle = window.getComputedStyle(document.body);
-        const paddingY = parseFloat(bodyStyle.paddingTop || 0) + parseFloat(bodyStyle.paddingBottom || 0);
-        const h = Math.ceil(root.scrollHeight + paddingY + 2);
-        if (window.ZOHO && window.ZOHO.CRM && window.ZOHO.CRM.UI && window.ZOHO.CRM.UI.Resize) {
-          window.ZOHO.CRM.UI.Resize({ height: String(h), width: '0' });
-        }
-      }, 150);
+    function burstResize() {
+      sendResize();
+      requestAnimationFrame(sendResize);
+      [300, 800, 1500, 3000].forEach((delay) => {
+        settleTimers.push(setTimeout(sendResize, delay));
+      });
     }
 
     const observer = new ResizeObserver(sendResize);
     const root = document.getElementById('root');
+    const content = document.getElementById('overview-content');
     if (root) observer.observe(root);
+    if (content && content !== root) observer.observe(content);
 
-    sendResize();
-    const initTimer = setTimeout(sendResize, 500);
+    function ensureZohoResizeReady() {
+      let attempts = 0;
+      const check = () => {
+        if (window.ZOHO && window.ZOHO.CRM && window.ZOHO.CRM.UI && window.ZOHO.CRM.UI.Resize) {
+          burstResize();
+          return;
+        }
+        if (attempts < 20) {
+          attempts += 1;
+          readyTimer = setTimeout(check, 250);
+        }
+      };
+      check();
+    }
+
+    burstResize();
+    ensureZohoResizeReady();
     window.addEventListener('resize', sendResize);
+    window.addEventListener('load', burstResize);
+    const unsubscribeResize = window.OverviewWidget.onResizeRequest(sendResize);
 
     return () => {
       observer.disconnect();
       clearTimeout(timer);
-      clearTimeout(initTimer);
+      clearTimeout(readyTimer);
+      settleTimers.forEach(clearTimeout);
       window.removeEventListener('resize', sendResize);
+      window.removeEventListener('load', burstResize);
+      unsubscribeResize();
     };
   }, []);
 }
@@ -134,7 +185,7 @@ const MainWidget = () => {
   useZohoPageLoadBridge();
   useDynamicHeight();
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+    <div id="overview-content" className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
       <div className="lg:col-span-2 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
           <ClientDetailsCard />
@@ -174,4 +225,5 @@ const MainWidget = () => {
     </div>
   );
 };
+
 ReactDOM.createRoot(document.getElementById('root')).render(<MainWidget />);

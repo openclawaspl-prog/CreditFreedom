@@ -16,7 +16,7 @@ process.env.PWD = process.env.PWD || process.cwd();
 
 
 var expressApp = express();
-var port = 1000;
+var port = 8080;
 
 expressApp.set('port', port);
 expressApp.use(morgan('dev'));

@@ -97,95 +97,35 @@ function useZohoPageLoadBridge() {
 function useDynamicHeight() {
   useResizeEffect(() => {
     let timer;
-    let retryTimer;
-
-    function getContentHeight() {
-      const root = document.getElementById('root');
-      const rootRect = root ? root.getBoundingClientRect() : null;
-      const bodyRect = document.body.getBoundingClientRect();
-      const doc = document.documentElement;
-
-      return Math.ceil(Math.max(
-        document.body.scrollHeight,
-        document.body.offsetHeight,
-        doc.scrollHeight,
-        doc.offsetHeight,
-        root ? root.scrollHeight : 0,
-        rootRect ? rootRect.bottom + window.scrollY : 0,
-        bodyRect.bottom + window.scrollY
-      ) + 32);
-    }
-
-    function publishHeight(height) {
-      if (window.ZOHO && window.ZOHO.CRM && window.ZOHO.CRM.UI && window.ZOHO.CRM.UI.Resize) {
-        window.ZOHO.CRM.UI.Resize({ height: String(height), width: '0' });
-      }
-
-      try {
-        if (window.frameElement) {
-          window.frameElement.style.height = height + 'px';
-          window.frameElement.setAttribute('height', String(height));
-        }
-      } catch (e) {}
-
-      try {
-        window.parent && window.parent.postMessage({
-          type: 'overview-widget-resize',
-          source: 'Overview',
-          height,
-        }, '*');
-      } catch (e) {}
-    }
 
     function sendResize() {
       clearTimeout(timer);
       timer = setTimeout(() => {
-        publishHeight(getContentHeight());
+        const root = document.getElementById('root');
+        if (!root) return;
+
+        const bodyStyle = window.getComputedStyle(document.body);
+        const paddingY = parseFloat(bodyStyle.paddingTop || 0) + parseFloat(bodyStyle.paddingBottom || 0);
+        const h = Math.ceil(root.scrollHeight + paddingY + 2);
+        if (window.ZOHO && window.ZOHO.CRM && window.ZOHO.CRM.UI && window.ZOHO.CRM.UI.Resize) {
+          window.ZOHO.CRM.UI.Resize({ height: String(h), width: '0' });
+        }
       }, 150);
     }
 
-    function burstResize() {
-      sendResize();
-      requestAnimationFrame(sendResize);
-      [250, 750, 1500, 3000, 6000].forEach(delay => setTimeout(sendResize, delay));
-    }
-
     const observer = new ResizeObserver(sendResize);
-    observer.observe(document.body);
-    observer.observe(document.documentElement);
     const root = document.getElementById('root');
     if (root) observer.observe(root);
 
-    const mutationObserver = new MutationObserver(sendResize);
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-      characterData: true,
-      attributes: true,
-    });
-
-    window.addEventListener('resize', sendResize);
-    window.addEventListener('load', sendResize);
-
-    const unsubscribeResize = window.OverviewWidget.onResizeRequest(burstResize);
-    const unsubscribePageLoad = window.OverviewWidget.onPageLoad(burstResize);
-
-    burstResize();
+    sendResize();
     const initTimer = setTimeout(sendResize, 500);
-    retryTimer = setInterval(sendResize, 1000);
-    const stopRetryTimer = setTimeout(() => clearInterval(retryTimer), 15000);
+    window.addEventListener('resize', sendResize);
 
     return () => {
       observer.disconnect();
-      mutationObserver.disconnect();
-      unsubscribeResize();
-      unsubscribePageLoad();
-      window.removeEventListener('resize', sendResize);
-      window.removeEventListener('load', sendResize);
       clearTimeout(timer);
       clearTimeout(initTimer);
-      clearTimeout(stopRetryTimer);
-      clearInterval(retryTimer);
+      window.removeEventListener('resize', sendResize);
     };
   }, []);
 }
@@ -194,68 +134,44 @@ const MainWidget = () => {
   useZohoPageLoadBridge();
   useDynamicHeight();
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+      <div className="lg:col-span-2 space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+          <ClientDetailsCard />
 
-      {/* ── 1. Client Details ── col 1 on md+, full-width on sm */}
-      <div className="lg:col-start-1">
-        <ClientDetailsCard />
-      </div>
+          <div className="space-y-4">
+            <PaymentDetailsCard />
+            <PaymentActionsCard />
+          </div>
+        </div>
 
-      {/* ── 2. Payment Details + Actions ── col 2 on md+, full-width on sm */}
-      <div className="space-y-4 lg:col-start-2">
-        <PaymentDetailsCard />
-        <PaymentActionsCard />
-      </div>
-
-      {/* ── 3. Credit Bureau Reports ── spans both cols on md+, full-width on sm */}
-      <div className="md:col-span-2 lg:col-span-2 lg:col-start-1">
         <CreditBureauReportsCard />
-      </div>
-
-      {/* ── 3a. Alert Control Panel ── spans both cols on md+, full-width on sm */}
-      <div className="md:col-span-2 lg:col-span-2 lg:col-start-1">
         <AlertcontrolPanelCard />
-      </div>
 
-      {/* ── 3b. Logins + Billing/Balance ── spans both cols on md+, full-width on sm */}
-      <div className="md:col-span-2 lg:col-span-2 lg:col-start-1">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
-          <div className="flex flex-col h-full gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+          <div className="space-y-4">
             <LogginCredentialsCard stretch />
             <MessageTemplatesCard />
           </div>
-          <div className="flex flex-col h-full gap-4">
+
+          <div className="space-y-4">
             <BillingNotesCard />
             <TotalBalanceCard />
-              <ReferralCreditsCard />
+            <ReferralCreditsCard />
           </div>
         </div>
+
+        <StartedAccountsCard />
       </div>
 
-        {/* ── 3b. Started Accounts ── spans both cols on md+, full-width on sm */}
-        <div className="md:col-span-2 lg:col-span-2 lg:col-start-1">
-          <StartedAccountsCard />
-        </div>
-      {/* ── 7. Referral Credits ── col 2 on md+, full-width on sm */}
-
-      {/* ── 8. Sidebar ──────────────────────────────────────────────
-           HTML order: LAST → correct stacking on sm/md
-           lg: snaps to col 3, row 1, spanning all content rows
-      ─────────────────────────────────────────────────────────── */}
-      <div className="
-        md:col-span-2
-        lg:col-span-1 lg:col-start-3 lg:row-start-1 lg:row-span-6
-        space-y-4
-      ">
+      <div className="space-y-4">
         <CommentsCard />
         <CreditBureauAutomationCard />
         <ProgramEligibilityCard />
         <ActivitiesCard />
         <AccountsCountChart />
       </div>
-
     </div>
   );
 };
-
 ReactDOM.createRoot(document.getElementById('root')).render(<MainWidget />);

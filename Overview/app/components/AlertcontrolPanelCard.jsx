@@ -25,8 +25,21 @@ const FIELD_DEFS = [
   { label: 'Name Alert', api: 'Name_Alert' },
 ];
 
+const BILLING_ISSUE_API = 'BILLING_ISSUE';
+const BILLING_ISSUE_DATE_API = 'BILLING_ISSUE_DATE';
+
 function toBool(value) {
   return value === true || value === 'true' || value === 'yes' || value === 'Yes' || value === 1;
+}
+
+function toDateInputValue(value) {
+  if (!value) return '';
+  if (typeof value === 'string') return value.slice(0, 10);
+  try {
+    return new Date(value).toISOString().slice(0, 10);
+  } catch {
+    return '';
+  }
 }
 
 function ToggleSwitch({ checked, disabled, onChange }) {
@@ -55,6 +68,10 @@ function AlertcontrolPanelCard() {
   const [saving, setSaving] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const alertColumns = FIELD_DEFS.reduce((cols, field, index) => {
+    cols[index % 2].push(field);
+    return cols;
+  }, [[], []]);
 
   useEffect(() => {
     return window.OverviewWidget.onPageLoad((data) => {
@@ -75,6 +92,7 @@ function AlertcontrolPanelCard() {
           FIELD_DEFS.forEach((field) => {
             nextValues[field.api] = toBool(record[field.api]);
           });
+          nextValues[BILLING_ISSUE_DATE_API] = toDateInputValue(record[BILLING_ISSUE_DATE_API]);
           setValues(nextValues);
         })
         .catch(() => setError('Failed to load alert settings.'))
@@ -110,6 +128,32 @@ function AlertcontrolPanelCard() {
       });
   }
 
+  function updateBillingIssueDate(nextDate) {
+    if (!recordId) return;
+
+    const previousDate = values[BILLING_ISSUE_DATE_API] || '';
+    setValues((prev) => ({ ...prev, [BILLING_ISSUE_DATE_API]: nextDate }));
+    setSaving((prev) => ({ ...prev, [BILLING_ISSUE_DATE_API]: true }));
+    setError(null);
+
+    ZOHO.CRM.API.updateRecord({
+      Entity: 'Contacts',
+      APIData: {
+        id: recordId,
+        [BILLING_ISSUE_DATE_API]: nextDate || null,
+      },
+      Trigger: ['workflow'],
+    })
+      .then(() => {
+        setSaving((prev) => ({ ...prev, [BILLING_ISSUE_DATE_API]: false }));
+      })
+      .catch(() => {
+        setSaving((prev) => ({ ...prev, [BILLING_ISSUE_DATE_API]: false }));
+        setValues((prev) => ({ ...prev, [BILLING_ISSUE_DATE_API]: previousDate }));
+        setError('Failed to update billing issue date.');
+      });
+  }
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4">
       <h2 className="text-base font-bold text-gray-900 mb-4">Alert Control Panel</h2>
@@ -120,15 +164,41 @@ function AlertcontrolPanelCard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {FIELD_DEFS.map((field) => (
-          <div key={field.api} className="bg-gray-100 rounded-xl px-4 py-4 flex items-center justify-between gap-4">
-            <span className="text-sm font-medium text-gray-700">{field.label}</span>
-            <ToggleSwitch
-              checked={!!values[field.api]}
-              disabled={loading || !!saving[field.api]}
-              onChange={(checked) => updateField(field.api, checked)}
-            />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
+        {alertColumns.map((column, columnIndex) => (
+          <div key={columnIndex} className="space-y-3">
+            {column.map((field) => {
+              const isBillingIssue = field.api === BILLING_ISSUE_API;
+              const billingIssueOn = !!values[BILLING_ISSUE_API];
+
+              return (
+                <div key={field.api} className="bg-gray-100 rounded-xl px-4 py-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-sm font-medium text-gray-700">{field.label}</span>
+                    <ToggleSwitch
+                      checked={!!values[field.api]}
+                      disabled={loading || !!saving[field.api]}
+                      onChange={(checked) => updateField(field.api, checked)}
+                    />
+                  </div>
+
+                  {isBillingIssue && billingIssueOn && (
+                    <div className="mt-3 border-t border-gray-200 pt-3">
+                      <label className="mb-1.5 block text-xs font-semibold text-gray-500">
+                        Billing Issue Date
+                      </label>
+                      <input
+                        type="date"
+                        value={values[BILLING_ISSUE_DATE_API] || ''}
+                        disabled={loading || !!saving[BILLING_ISSUE_DATE_API]}
+                        onChange={(e) => updateBillingIssueDate(e.target.value)}
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:opacity-60"
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ))}
       </div>

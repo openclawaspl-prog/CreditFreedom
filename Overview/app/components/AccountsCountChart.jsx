@@ -10,22 +10,25 @@
 */
 const { useState: useAcctState, useEffect: useAcctEffect } = React;
 
-const BLOCK_TYPES = ['late','new','start','charged','closed','account_change','removed'];
-const LABELS = {
-  late: 'Late', new: 'New', start: 'Started',
-  charged: 'Charged', closed: 'Closed',
-  account_change: 'Acct Change', removed: 'Removed',
-};
 const BUREAUS = ['Equifax', 'TransUnion', 'Experian'];
-const BAR_COLOR         = '#818cf8';   // indigo-400 — default
-const BAR_COLOR_HOVERED = '#6366f1';   // indigo-500 — on hover
+const LABELS = { Equifax: 'Equifax', TransUnion: 'TransUnion', Experian: 'Experian' };
+const BUREAU_COLORS = {
+  Equifax: '#ec4899',
+  TransUnion: '#818cf8',
+  Experian: '#a78bfa',
+};
+const BUREAU_HOVER_COLORS = {
+  Equifax: '#db2777',
+  TransUnion: '#6366f1',
+  Experian: '#8b5cf6',
+};
 
 /* Chart layout constants */
-const CW = 420, CH = 260;
-const PL = 32, PR = 12, PT = 18, PB = 52;
+const CW = 420, CH = 290;
+const PL = 32, PR = 12, PT = 18, PB = 70;
 const IW = CW - PL - PR;
 const IH = CH - PT - PB;
-const SLOT_W = IW / BLOCK_TYPES.length;
+const SLOT_W = IW / BUREAUS.length;
 const BAR_W  = Math.min(SLOT_W * 0.55, 42);
 
 function barTop(val, maxVal) { return PT + IH - (val / maxVal) * IH; }
@@ -41,15 +44,13 @@ function normalizeBureau(val) {
 
 function buildCounts(accounts) {
   const counts = {};
-  BLOCK_TYPES.forEach(t => {
-    counts[t] = { total: 0, Equifax: 0, TransUnion: 0, Experian: 0 };
+  BUREAUS.forEach(bureau => {
+    counts[bureau] = { total: 0 };
   });
   (accounts || []).forEach(acc => {
-    const type   = (acc.block_type || '').trim().toLowerCase();
     const bureau = normalizeBureau(acc.Creditor);
-    if (!counts[type]) return;
-    counts[type].total++;
-    if (bureau) counts[type][bureau]++;
+    if (!bureau || !counts[bureau]) return;
+    counts[bureau].total++;
   });
   return counts;
 }
@@ -63,27 +64,45 @@ function niceYTicks(maxVal) {
   return ticks;
 }
 
+async function fetchClientAccountsByClientId(clientId) {
+  if (!clientId || !ZOHO || !ZOHO.CRM || !ZOHO.CRM.API || !ZOHO.CRM.API.searchRecord) return [];
+
+  const all = [];
+  const perPage = 200;
+  const query = `(Client_ID:equals:${clientId})`;
+
+  for (let page = 1; page <= 10; page++) {
+    const resp = await ZOHO.CRM.API.searchRecord({
+      Entity: 'Client_Account',
+      Type: 'criteria',
+      Query: query,
+    }, page, perPage);
+
+    const data = (resp && resp.data) || [];
+    all.push(...data);
+
+    const more = resp && resp.info && resp.info.more_records;
+    if (!more || data.length < perPage) break;
+  }
+
+  return all;
+}
+
 function AccountsCountChart() {
   const [rawAccounts, setRawAccounts] = useAcctState([]);
-  const [hovered,     setHovered]     = useAcctState(null);  // block_type key
+  const [hovered,     setHovered]     = useAcctState(null);  // creditor/bureau key
 
   useAcctEffect(() => {
     return window.OverviewWidget.onPageLoad((data) => {
-      ZOHO.CRM.API.getRelatedRecords({
-        Entity:      'Contacts',
-        RecordID:    data.EntityId,
-        RelatedList: 'Client_Account',
-        page:        1,
-        per_page:    200,
-      })
-        .then(resp => setRawAccounts((resp && resp.data) || []))
-        .catch(() => {})
+      fetchClientAccountsByClientId(data.EntityId)
+        .then(accounts => setRawAccounts(accounts))
+        .catch(() => setRawAccounts([]))
         .finally(() => window.OverviewWidget.requestResize());
     });
   }, []);
 
   const counts  = buildCounts(rawAccounts);
-  const maxVal  = Math.max(...BLOCK_TYPES.map(t => counts[t].total), 1);
+  const maxVal  = Math.max(...BUREAUS.map(b => counts[b].total), 1);
   const yTicks  = niceYTicks(maxVal);
 
   /* Tooltip: position above the hovered bar's center */
@@ -99,9 +118,9 @@ function AccountsCountChart() {
 
       {/* Bureau legend */}
       <div className="flex items-center gap-4 mb-3">
-        {[['#ec4899','Equifax'],['#818cf8','TransUnion'],['#a78bfa','Experian']].map(([col,name]) => (
+        {BUREAUS.map(name => (
           <div key={name} className="flex items-center gap-1.5">
-            <span style={{ width:8, height:8, borderRadius:'50%', background:col, display:'inline-block' }} />
+            <span style={{ width:8, height:8, borderRadius:'50%', background:BUREAU_COLORS[name], display:'inline-block' }} />
             <span className="text-[11px] text-gray-500">{name}</span>
           </div>
         ))}
@@ -119,7 +138,7 @@ function AccountsCountChart() {
             <g key={tick}>
               <line x1={PL} y1={y} x2={CW - PR} y2={y}
                 stroke={tick === 0 ? '#e5e7eb' : '#f3f4f6'} strokeWidth="1" />
-              <text x={PL - 5} y={y + 4} textAnchor="end" fontSize="10" fill="#9ca3af">
+              <text x={PL - 5} y={y + 4} textAnchor="end" fontSize="13" fill="black">
                 {tick}
               </text>
             </g>
@@ -127,14 +146,14 @@ function AccountsCountChart() {
         })}
 
         {/* Bars */}
-        {BLOCK_TYPES.map((type, i) => {
-          const total  = counts[type].total;
+        {BUREAUS.map((bureau, i) => {
+          const total  = counts[bureau].total;
           const mxTick = Math.max(...yTicks);
           const cx     = PL + SLOT_W * i + SLOT_W / 2;
           const bX     = cx - BAR_W / 2;
           const bY     = barTop(total, mxTick);
           const bH     = barHt(total, mxTick);
-          const isHov  = hovered === type;
+          const isHov  = hovered === bureau;
           const rx     = 4;
 
           const barPath = bH > rx
@@ -143,32 +162,31 @@ function AccountsCountChart() {
 
           return (
             <g
-              key={type}
+              key={bureau}
               style={{ cursor: 'pointer' }}
-              onMouseEnter={() => setHovered(type)}
+              onMouseEnter={() => setHovered(bureau)}
             >
               {/* Invisible wider hit area for easier hover */}
               <rect x={bX - 6} y={PT} width={BAR_W + 12} height={IH + 4} fill="transparent" />
 
               {/* Bar */}
-              <path d={barPath} fill={isHov ? BAR_COLOR_HOVERED : BAR_COLOR} />
+              <path d={barPath} fill={isHov ? BUREAU_HOVER_COLORS[bureau] : BUREAU_COLORS[bureau]} />
 
               {/* Value label on top */}
               {total > 0 && (
-                <text x={cx} y={bY - 4} textAnchor="middle" fontSize="10" fontWeight="600" fill="#374151">
+                <text x={cx} y={bY - 4} textAnchor="middle" fontSize="12" fontWeight="500" fill="#374151">
                   {total}
                 </text>
               )}
 
-              {/* X-axis label — rotated to fit */}
+              {/* X-axis label */}
               <text
-                x={cx} y={CH - 4}
-                textAnchor="end"
-                fontSize="9.5" fill={isHov ? '#4f46e5' : '#6b7280'}
+                x={cx} y={CH - 24}
+                textAnchor="middle"
+                fontSize="13" fill={isHov ? BUREAU_HOVER_COLORS[bureau] : 'black'}
                 fontWeight={isHov ? '600' : '400'}
-                transform={`rotate(-35, ${cx}, ${CH - 4})`}
               >
-                {LABELS[type]}
+                {LABELS[bureau]}
               </text>
             </g>
           );
@@ -176,7 +194,7 @@ function AccountsCountChart() {
 
         {/* Hover tooltip (SVG-native, no positioning issues) */}
         {hovered && (() => {
-          const i      = BLOCK_TYPES.indexOf(hovered);
+          const i      = BUREAUS.indexOf(hovered);
           const data   = counts[hovered];
           const ttX    = tooltipX(i);
           const barCY  = barTop(data.total, Math.max(...yTicks));
@@ -190,12 +208,9 @@ function AccountsCountChart() {
               <text x={ttX + 9} y={ttY + 15} fontSize="10.5" fontWeight="700" fill="white">
                 {LABELS[hovered]}: {data.total}
               </text>
-              {BUREAUS.map((b, bi) => (
-                <text key={b} x={ttX + 9} y={ttY + 30 + bi * 14}
-                  fontSize="10" fill="#d1d5db">
-                  {b}: {data[b]}
-                </text>
-              ))}
+              <text x={ttX + 9} y={ttY + 34} fontSize="10" fill="#d1d5db">
+                Total accounts: {data.total}
+              </text>
             </g>
           );
         })()}

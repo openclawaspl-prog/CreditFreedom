@@ -135,6 +135,13 @@ function zohoStr(val) {
   return String(val);
 }
 
+function isSoftDeletedAccount(account) {
+  const value = account && account.Delete_flag;
+  if (value === true) return true;
+  if (value === false || value == null) return false;
+  return String(value).trim().toLowerCase() === 'true';
+}
+
 function normalizeBureau(val) {
   const s = zohoStr(val).trim().toLowerCase().replace(/[\s_-]/g, '');
   if (s === 'equifax') return 'Equifax';
@@ -150,7 +157,7 @@ function buildCounts(accounts) {
     BLOCK_TYPES.forEach(t => { counts[b][t] = 0; });
   });
 
-  (accounts || []).forEach(acc => {
+  (accounts || []).filter(acc => !isSoftDeletedAccount(acc)).forEach(acc => {
     const bureau = normalizeBureau(
       acc.Creditor || acc.Bureau || acc.Credit_Bureau || acc.CreditBureau || acc.Creditor_Name
     );
@@ -171,16 +178,41 @@ function useDynamicHeight() {
     function sendResize() {
       clearTimeout(timer);
       timer = setTimeout(() => {
-        const h = document.body.scrollHeight + 32;
+        const root = document.getElementById('root');
+        if (!root) return;
+
+        const bodyStyle = window.getComputedStyle(document.body);
+        const paddingTop = parseFloat(bodyStyle.paddingTop || 0);
+        const paddingBottom = parseFloat(bodyStyle.paddingBottom || 0);
+        const rootRect = root.getBoundingClientRect();
+        const measuredRootHeight = Math.max(
+          root.scrollHeight,
+          root.offsetHeight,
+          rootRect.height
+        );
+        const h = Math.ceil(measuredRootHeight + paddingTop + paddingBottom + 40);
         if (window.ZOHO && window.ZOHO.CRM && window.ZOHO.CRM.UI && window.ZOHO.CRM.UI.Resize) {
           window.ZOHO.CRM.UI.Resize({ height: String(h), width: '0' });
         }
       }, 150);
     }
+    function burstResize() {
+      sendResize();
+      requestAnimationFrame(sendResize);
+      [300, 800, 1500, 3000].forEach(delay => setTimeout(sendResize, delay));
+    }
     const observer = new ResizeObserver(sendResize);
-    observer.observe(document.body);
-    const t = setTimeout(sendResize, 500);
-    return () => { observer.disconnect(); clearTimeout(timer); clearTimeout(t); };
+    const root = document.getElementById('root');
+    if (root) observer.observe(root);
+    burstResize();
+    window.addEventListener('resize', sendResize);
+    window.addEventListener('load', burstResize);
+    return () => {
+      observer.disconnect();
+      clearTimeout(timer);
+      window.removeEventListener('resize', sendResize);
+      window.removeEventListener('load', burstResize);
+    };
   }, []);
 }
 
@@ -272,7 +304,7 @@ async function fetchAccounts(zoho, entity, idStr) {
     console.error('[CF] getAllRecords error:', formatZohoError(err));
   }
 
-  return all;
+  return all.filter(row => !isSoftDeletedAccount(row));
 }
 
 const DisputeWidget = () => {
@@ -347,7 +379,9 @@ const DisputeWidget = () => {
 
           if (!alive) return;
 
-          const safeAccounts = Array.isArray(accountRows) ? accountRows : [];
+          const safeAccounts = Array.isArray(accountRows)
+            ? accountRows.filter(row => !isSoftDeletedAccount(row))
+            : [];
           const freshCounts = buildCounts(safeAccounts);
 
           setAccounts(safeAccounts);

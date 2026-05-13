@@ -98,8 +98,19 @@ function CommentsCard() {
   };
 
   const scrollToLatest = () => {
-    if (!commentsScrollRef.current) return;
-    commentsScrollRef.current.scrollTop = commentsScrollRef.current.scrollHeight;
+    const el = commentsScrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    requestAnimationFrame(() => {
+      if (commentsScrollRef.current) {
+        commentsScrollRef.current.scrollTop = commentsScrollRef.current.scrollHeight;
+      }
+    });
+    setTimeout(() => {
+      if (commentsScrollRef.current) {
+        commentsScrollRef.current.scrollTop = commentsScrollRef.current.scrollHeight;
+      }
+    }, 100);
   };
 
   const formatTimestamp = (isoDate) => {

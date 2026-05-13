@@ -30,26 +30,168 @@
 */
 const { useEffect: useResizeEffect } = React;
 
+window.OverviewWidget = window.OverviewWidget || {
+  pageData: null,
+  listeners: new Set(),
+  resizeHandlers: new Set(),
+  zohoInitialized: false,
+  onPageLoad(callback) {
+    this.listeners.add(callback);
+    if (this.pageData) {
+      setTimeout(() => callback(this.pageData), 0);
+    }
+    return () => this.listeners.delete(callback);
+  },
+  emitPageLoad(data) {
+    this.pageData = data;
+    this.listeners.forEach((callback) => callback(data));
+    this.requestResize();
+  },
+  onResizeRequest(callback) {
+    this.resizeHandlers.add(callback);
+    return () => this.resizeHandlers.delete(callback);
+  },
+  requestResize() {
+    this.resizeHandlers.forEach((callback) => callback());
+  },
+};
+
+function waitForZohoSdk() {
+  return new Promise((resolve) => {
+    const startedAt = Date.now();
+    const tick = () => {
+      if (window.ZOHO && window.ZOHO.embeddedApp) {
+        resolve(window.ZOHO);
+        return;
+      }
+      if (Date.now() - startedAt > 5000) {
+        resolve(null);
+        return;
+      }
+      setTimeout(tick, 100);
+    };
+    tick();
+  });
+}
+
+function useZohoPageLoadBridge() {
+  useResizeEffect(() => {
+    let cancelled = false;
+
+    waitForZohoSdk().then((zoho) => {
+      if (cancelled || !zoho || window.OverviewWidget.zohoInitialized) return;
+
+      zoho.embeddedApp.on('PageLoad', (data) => {
+        window.OverviewWidget.emitPageLoad(data);
+      });
+      zoho.embeddedApp.init();
+      window.OverviewWidget.zohoInitialized = true;
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+}
+
 function useDynamicHeight() {
   useResizeEffect(() => {
     let timer;
+    let retryTimer;
+
+    function getContentHeight() {
+      const root = document.getElementById('root');
+      const rootRect = root ? root.getBoundingClientRect() : null;
+      const bodyRect = document.body.getBoundingClientRect();
+      const doc = document.documentElement;
+
+      return Math.ceil(Math.max(
+        document.body.scrollHeight,
+        document.body.offsetHeight,
+        doc.scrollHeight,
+        doc.offsetHeight,
+        root ? root.scrollHeight : 0,
+        rootRect ? rootRect.bottom + window.scrollY : 0,
+        bodyRect.bottom + window.scrollY
+      ) + 32);
+    }
+
+    function publishHeight(height) {
+      if (window.ZOHO && window.ZOHO.CRM && window.ZOHO.CRM.UI && window.ZOHO.CRM.UI.Resize) {
+        window.ZOHO.CRM.UI.Resize({ height: String(height), width: '0' });
+      }
+
+      try {
+        if (window.frameElement) {
+          window.frameElement.style.height = height + 'px';
+          window.frameElement.setAttribute('height', String(height));
+        }
+      } catch (e) {}
+
+      try {
+        window.parent && window.parent.postMessage({
+          type: 'overview-widget-resize',
+          source: 'Overview',
+          height,
+        }, '*');
+      } catch (e) {}
+    }
+
     function sendResize() {
       clearTimeout(timer);
       timer = setTimeout(() => {
-        const h = document.body.scrollHeight + 32;
-        if (window.ZOHO && window.ZOHO.CRM && window.ZOHO.CRM.UI && window.ZOHO.CRM.UI.Resize) {
-          window.ZOHO.CRM.UI.Resize({ height: String(h), width: '0' });
-        }
+        publishHeight(getContentHeight());
       }, 150);
     }
+
+    function burstResize() {
+      sendResize();
+      requestAnimationFrame(sendResize);
+      [250, 750, 1500, 3000, 6000].forEach(delay => setTimeout(sendResize, delay));
+    }
+
     const observer = new ResizeObserver(sendResize);
     observer.observe(document.body);
+    observer.observe(document.documentElement);
+    const root = document.getElementById('root');
+    if (root) observer.observe(root);
+
+    const mutationObserver = new MutationObserver(sendResize);
+    mutationObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+    });
+
+    window.addEventListener('resize', sendResize);
+    window.addEventListener('load', sendResize);
+
+    const unsubscribeResize = window.OverviewWidget.onResizeRequest(burstResize);
+    const unsubscribePageLoad = window.OverviewWidget.onPageLoad(burstResize);
+
+    burstResize();
     const initTimer = setTimeout(sendResize, 500);
-    return () => { observer.disconnect(); clearTimeout(timer); clearTimeout(initTimer); };
+    retryTimer = setInterval(sendResize, 1000);
+    const stopRetryTimer = setTimeout(() => clearInterval(retryTimer), 15000);
+
+    return () => {
+      observer.disconnect();
+      mutationObserver.disconnect();
+      unsubscribeResize();
+      unsubscribePageLoad();
+      window.removeEventListener('resize', sendResize);
+      window.removeEventListener('load', sendResize);
+      clearTimeout(timer);
+      clearTimeout(initTimer);
+      clearTimeout(stopRetryTimer);
+      clearInterval(retryTimer);
+    };
   }, []);
 }
 
 const MainWidget = () => {
+  useZohoPageLoadBridge();
   useDynamicHeight();
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">

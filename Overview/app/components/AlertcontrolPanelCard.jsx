@@ -57,7 +57,7 @@ function AlertcontrolPanelCard() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    ZOHO.embeddedApp.on('PageLoad', (data) => {
+    return window.OverviewWidget.onPageLoad((data) => {
       const id = data.EntityId;
       setRecordId(id);
       setLoading(true);
@@ -78,10 +78,11 @@ function AlertcontrolPanelCard() {
           setValues(nextValues);
         })
         .catch(() => setError('Failed to load alert settings.'))
-        .finally(() => setLoading(false));
+        .finally(() => {
+          setLoading(false);
+          window.OverviewWidget.requestResize();
+        });
     });
-
-    ZOHO.embeddedApp.init();
   }, []);
 
   function updateField(apiName, nextValue) {

@@ -27,7 +27,7 @@ function DisputeStatusTable({ counts }) {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-2">
+    <div className="cf-glass bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-2">
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>

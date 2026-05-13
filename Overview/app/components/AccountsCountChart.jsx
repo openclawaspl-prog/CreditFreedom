@@ -68,7 +68,7 @@ function AccountsCountChart() {
   const [hovered,     setHovered]     = useAcctState(null);  // block_type key
 
   useAcctEffect(() => {
-    ZOHO.embeddedApp.on('PageLoad', (data) => {
+    return window.OverviewWidget.onPageLoad((data) => {
       ZOHO.CRM.API.getRelatedRecords({
         Entity:      'Contacts',
         RecordID:    data.EntityId,
@@ -77,9 +77,9 @@ function AccountsCountChart() {
         per_page:    200,
       })
         .then(resp => setRawAccounts((resp && resp.data) || []))
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => window.OverviewWidget.requestResize());
     });
-    ZOHO.embeddedApp.init();
   }, []);
 
   const counts  = buildCounts(rawAccounts);

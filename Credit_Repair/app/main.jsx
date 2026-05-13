@@ -188,7 +188,7 @@ function Skeleton() {
   const Bar = ({ cls }) => <div className={`h-3 bg-blue-300 rounded animate-pulse ${cls}`} />;
   return (
     <div className="space-y-4">
-      <div className="rounded-xl px-6 py-5" style={{ background: '#1d4ed8' }}>
+      <div className="cf-glass-hero rounded-xl px-6 py-5" style={{ background: '#1d4ed8' }}>
         <div className="grid grid-cols-2 gap-x-12 gap-y-4">
           {[1, 2, 3, 4].map(i => (
             <div key={i} className="space-y-2">
@@ -199,8 +199,8 @@ function Skeleton() {
         </div>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="h-56 bg-white rounded-xl border border-gray-200 animate-pulse" />
-        <div className="h-56 bg-white rounded-xl border border-gray-200 animate-pulse" />
+        <div className="cf-glass h-56 bg-white rounded-xl border border-gray-200 animate-pulse" />
+        <div className="cf-glass h-56 bg-white rounded-xl border border-gray-200 animate-pulse" />
       </div>
     </div>
   );

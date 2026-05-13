@@ -90,7 +90,7 @@ function CreditScoresCard({ record }) {
   ];
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4">
+    <div className="cf-glass bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4">
       <div className="flex gap-4">
         {cols.map((c, i) => (
           <React.Fragment key={c.name}>

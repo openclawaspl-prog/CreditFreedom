@@ -8,7 +8,7 @@ function ClientHeaderCard({ name, email, referredBy, status }) {
 
   return (
     <div
-      className="rounded-xl px-6 py-5"
+      className="cf-glass-hero rounded-xl px-6 py-5"
       style={{ background: 'linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 60%, #3b82f6 100%)' }}
     >
       <div className="grid grid-cols-2 gap-x-12 gap-y-4">

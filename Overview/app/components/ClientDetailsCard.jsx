@@ -181,7 +181,7 @@ function ClientDetailsCard() {
 
   /* ── Fetch with cache ── */
   useEffect(() => {
-    ZOHO.embeddedApp.on('PageLoad', (data) => {
+    return window.OverviewWidget.onPageLoad((data) => {
       const recordId = data.EntityId;
 
       /* ① Instant render from cache */
@@ -215,10 +215,9 @@ function ClientDetailsCard() {
         .finally(() => {
           setLoading(false);
           setRefreshing(false);
+          window.OverviewWidget.requestResize();
         });
     });
-
-    ZOHO.embeddedApp.init();
   }, []);
 
   /* ── Keyboard shortcuts ── */

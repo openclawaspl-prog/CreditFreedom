@@ -81,7 +81,7 @@ function LogginCredentialsCard({ stretch = false } = {}) {
   const cardClass = `bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4 w-full${stretch ? ' flex-1' : ''}`;
 
   useEffect(() => {
-    ZOHO.embeddedApp.on('PageLoad', (data) => {
+    return window.OverviewWidget.onPageLoad((data) => {
       const recordId = data.EntityId;
       setLoading(true);
       setError(null);
@@ -95,10 +95,11 @@ function LogginCredentialsCard({ stretch = false } = {}) {
           }
         })
         .catch(() => setError('Failed to load login credentials.'))
-        .finally(() => setLoading(false));
+        .finally(() => {
+          setLoading(false);
+          window.OverviewWidget.requestResize();
+        });
     });
-
-    ZOHO.embeddedApp.init();
   }, []);
 
   if (loading) {

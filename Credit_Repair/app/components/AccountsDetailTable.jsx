@@ -49,7 +49,7 @@ const F = {
   Creditor: 'Creditor',
   date: 'Created_Time',
   creditorName: 'Creditor_Name',
-  accountNum: 'Name',
+  accountNum: 'Account_Number',
   reason: 'Reason',
   instruction: 'Instruction',
   clientId: 'Client_ID',
@@ -111,6 +111,10 @@ function isDeletedFlag(val) {
   if (val === false || val == null) return false;
   if (typeof val === 'string') return val.toLowerCase() === 'true';
   return false;
+}
+
+function isDisplayDeleted(row) {
+  return dtStr(row && row[F.acctStatus]).trim().toLowerCase() === 'deleted';
 }
 
 function matchesContact(row, contactId) {
@@ -385,9 +389,10 @@ function MoveModal({ currentKey, onMove, onClose }) {
 }
 
 /* One section card */
-function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions, instructionOptions, readOnly = false }) {
+function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions, instructionOptions, dropdownOpen, setDropdownOpen, readOnly = false }) {
   const [sel, setSel] = useDtState(new Set());
-  const [open, setOpen] = useDtState({ id: null, field: null, style: null });
+  const open = dropdownOpen || { sectionKey: null, id: null, field: null, style: null };
+  const setOpen = setDropdownOpen;
   const [moveRowId, setMoveRowId] = useDtState(null);
   const [moveMenuOpen, setMoveMenuOpen] = useDtState(false);
   const [moveMenuStyle, setMoveMenuStyle] = useDtState(null);
@@ -406,15 +411,16 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
   }, [rows]);
 
   useDtEffect(() => {
-    if (!open.id) return;
+    if (!open.id || open.sectionKey !== section.key) return;
     function handle(e) {
-      if (!e.target.closest('[data-dropdown]')) {
-        setOpen({ id: null, field: null, style: null });
+      const target = e.target && e.target.closest ? e.target : e.target && e.target.parentElement;
+      if (!target || !target.closest('[data-dropdown]')) {
+        setOpen({ sectionKey: null, id: null, field: null, style: null });
       }
     }
     document.addEventListener('mousedown', handle);
     return () => document.removeEventListener('mousedown', handle);
-  }, [open]);
+  }, [open.id, open.sectionKey, section.key]);
 
   useDtEffect(() => {
     if (!moveMenuOpen) return;
@@ -533,17 +539,25 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
     };
   }
 
-  function toggleDropdown(e, id, field) {
+  function dropdownRowKey(row) {
+    return row.id || [section.key, row[F.accountNum], row[F.Creditor], row[F.date], row[F.creditorName]]
+      .map(dtStr)
+      .join('|');
+  }
+
+  function toggleDropdown(e, rowKey, field) {
     if (readOnly) return;
-    setOpen(prev => (prev.id === id && prev.field === field)
-      ? { id: null, field: null, style: null }
-      : { id, field, style: buildMenuStyle(e.currentTarget) }
+    e.preventDefault();
+    e.stopPropagation();
+    setOpen(prev => (prev.sectionKey === section.key && prev.id === rowKey && prev.field === field)
+      ? { sectionKey: null, id: null, field: null, style: null }
+      : { sectionKey: section.key, id: rowKey, field, style: buildMenuStyle(e.currentTarget) }
     );
   }
   async function selectOption(row, field, optionId) {
     if (readOnly) return;
     const currentId = lookupId(row[field]);
-    setOpen({ id: null, field: null, style: null });
+    setOpen({ sectionKey: null, id: null, field: null, style: null });
     if (!optionId || String(optionId) === String(currentId)) return;
     setBusy(true);
     await onSaveRow(row.id, field, optionId);
@@ -580,47 +594,145 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
   const firstSelectedId = sel.size ? Array.from(sel)[0] : null;
 
 
-  function renderDropdown(row, field, options) {
+  function renderDropdownUnused(row, field, options) {
     const selectedId = lookupId(row[field]);
-    const selectedLabel = optionLabel(options, selectedId) || dtStr(row[field]) || 'Select';
+    let selectedLabel = optionLabel(options, selectedId) || dtStr(row[field]) || 'Select';
     const isOpen = open.id === row.id && open.field === field;
 
     if (readOnly) {
+      if (section.key === 'deleted' && selectedLabel.trim().toLowerCase() === 'select') {
+        selectedLabel = field === F.reason ? 'No reason selected' : 'No instruction selected';
+      }
       return <span className="text-[11px] text-gray-600">{selectedLabel || '—'}</span>;
     }
 
+    const hasSelectedOption = !selectedId || options.some(opt => String(opt.id) === String(selectedId));
+
     return (
-      <div className="relative" data-dropdown>
+      <select
+        value={selectedId || ''}
+        disabled={busy}
+        title={selectedLabel || 'Select'}
+        onChange={(e) => selectOption(row, field, e.target.value)}
+        className="w-36 text-[11px] border border-gray-200 rounded px-1.5 py-1 bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+      >
+        <option value="">Select</option>
+        {!hasSelectedOption && <option value={selectedId}>{selectedLabel}</option>}
+        {options.map(opt => (
+          <option key={opt.id} value={opt.id}>{opt.label}</option>
+        ))}
+      </select>
+    );
+
+    const dropdownMenu = isOpen ? (
+      <div
+        className="fixed overflow-auto rounded-md border border-gray-200 bg-white shadow-lg"
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          ...(open.style || { position: 'fixed', width: 320, maxHeight: 180 }),
+          zIndex: 2147483647,
+          pointerEvents: 'auto',
+        }}
+        data-dropdown
+      >
+        {options.length === 0 ? (
+          <div className="px-3 py-2 text-xs text-gray-400">No options</div>
+        ) : (
+          options.map(opt => (
+            <button
+              type="button"
+              key={opt.id}
+              onClick={() => selectOption(row, field, opt.id)}
+              className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 ${String(opt.id) === String(selectedId) ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+            >
+              {opt.label}
+            </button>
+          ))
+        )}
+      </div>
+    ) : null;
+
+    return (
+      <div className="relative" data-dropdown onMouseDown={(e) => e.stopPropagation()}>
         <button
           type="button"
-          onClick={(e) => toggleDropdown(e, row.id, field)}
+          onMouseDown={(e) => toggleDropdown(e, row.id, field)}
           className="w-28 text-left text-[11px] border border-gray-200 rounded px-1.5 py-0.5 bg-white hover:border-gray-300 flex items-center justify-between"
         >
           <span className="truncate">{selectedLabel || 'Select'}</span>
           <span className="ml-2 text-gray-400">▾</span>
         </button>
-        {isOpen && (
-          <div
-            className="fixed overflow-auto rounded-md border border-gray-200 bg-white shadow-lg"
-            style={open.style || { position: 'fixed', width: 320, maxHeight: 180, zIndex: 2147483647 }}
-            data-dropdown
-          >
-            {options.length === 0 ? (
-              <div className="px-3 py-2 text-xs text-gray-400">No options</div>
-            ) : (
-              options.map(opt => (
-                <button
-                  type="button"
-                  key={opt.id}
-                  onClick={() => selectOption(row, field, opt.id)}
-                  className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 ${String(opt.id) === String(selectedId) ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
-                >
-                  {opt.label}
-                </button>
-              ))
-            )}
-          </div>
-        )}
+        {dropdownMenu && typeof ReactDOM !== 'undefined' && ReactDOM.createPortal
+          ? ReactDOM.createPortal(dropdownMenu, document.body)
+          : dropdownMenu}
+      </div>
+    );
+  }
+
+  function renderDropdown(row, field, options) {
+    const selectedId = lookupId(row[field]);
+    let selectedLabel = optionLabel(options, selectedId) || dtStr(row[field]) || 'Select';
+    const rowKey = dropdownRowKey(row);
+    const isOpen = open.sectionKey === section.key && open.id === rowKey && open.field === field;
+
+    if (readOnly) {
+      if (section.key === 'deleted' && selectedLabel.trim().toLowerCase() === 'select') {
+        selectedLabel = field === F.reason ? 'No reason selected' : 'No instruction selected';
+      }
+      return <span className="text-[11px] text-gray-600">{selectedLabel || '—'}</span>;
+    }
+
+    const menu = isOpen ? (
+      <div
+        className="fixed rounded-lg border border-gray-200 bg-white shadow-2xl overflow-hidden"
+        data-dropdown
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          ...(open.style || { position: 'fixed', width: 320, maxHeight: 220 }),
+          zIndex: 2147483647,
+        }}
+      >
+        <div className="max-h-56 overflow-y-auto py-1">
+          {options.length === 0 ? (
+            <div className="px-3 py-2 text-xs text-gray-400">No options</div>
+          ) : (
+            options.map(opt => (
+              <button
+                type="button"
+                key={opt.id}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => selectOption(row, field, opt.id)}
+                className={`block w-full text-left px-3 py-2 text-xs transition-colors hover:bg-emerald-50 ${
+                  String(opt.id) === String(selectedId)
+                    ? 'bg-emerald-50 text-emerald-700 font-medium'
+                    : 'text-gray-700'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+    ) : null;
+
+    return (
+      <div className="relative inline-block" data-dropdown onMouseDown={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          disabled={busy}
+          title={selectedLabel || 'Select'}
+          onClick={(e) => toggleDropdown(e, rowKey, field)}
+          className="w-36 text-left text-[11px] border border-gray-200 rounded px-2 py-1 bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-200 flex items-center justify-between disabled:opacity-60"
+        >
+          <span className="truncate">{selectedLabel || 'Select'}</span>
+          <span className={`ml-2 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}>▾</span>
+        </button>
+        {menu && typeof ReactDOM !== 'undefined' && ReactDOM.createPortal
+          ? ReactDOM.createPortal(menu, document.body)
+          : menu}
       </div>
     );
   }
@@ -635,8 +747,8 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
 
   return (
     <div
-      className="cf-account-section rounded-xl border border-gray-200 shadow-sm overflow-visible relative bg-white"
-      style={{ zIndex: open.id ? 9999 : 0 }}
+      className="cf-glass cf-account-section rounded-xl border border-gray-200 shadow-sm overflow-visible relative bg-white"
+      style={{ zIndex: open.sectionKey === section.key && open.id ? 9999 : 0 }}
     >
       <style>
         {`
@@ -645,7 +757,7 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
           .cf-account-section tbody,
           .cf-account-section tr,
           .cf-account-section th {
-            background-color: #fff;
+            background-color: rgba(255, 255, 255, 0.42);
           }
 
           .cf-account-section td {
@@ -730,10 +842,11 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
 
       <div className="rounded-b-xl overflow-hidden bg-white">
         <div
+          className="cf-glass-scroll"
           style={{
             overflowX: 'auto',
             overflowY: 'auto',
-            background: '#fff',
+            background: 'rgba(255, 255, 255, 0.34)',
             maxHeight: 420,
             borderBottomLeftRadius: '0.75rem',
             borderBottomRightRadius: '0.75rem',
@@ -746,7 +859,7 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
             fontSize: 13,
             borderCollapse: 'separate',
             borderSpacing: 0,
-            background: '#fff',
+            background: 'rgba(255, 255, 255, 0.28)',
             minWidth: readOnly ? 1420 : 1540,
           }}
         >
@@ -794,10 +907,10 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
             )}
             {rows.map(row => (
               <tr
-                key={row.id}
+                key={dropdownRowKey(row)}
                 style={{
                   borderBottom: '1px solid #d1d5db',
-                  background: !readOnly && sel.has(row.id) ? 'rgba(219,234,254,0.35)' : '#fff',
+                  background: !readOnly && sel.has(row.id) ? 'rgba(219,234,254,0.50)' : 'rgba(255, 255, 255, 0.26)',
                 }}
                 className="hover:bg-gray-50 transition-colors"
               >
@@ -1011,10 +1124,11 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName }) 
   const [deletedAccounts, setDeletedAccounts] = useDtState([]);
   const [reasonOptions, setReasonOptions] = useDtState([]);
   const [instructionOptions, setInstructionOptions] = useDtState([]);
+  const [dropdownOpen, setDropdownOpen] = useDtState({ sectionKey: null, id: null, field: null, style: null });
 
   useDtEffect(() => {
-    const active = (propAccounts || []).filter(r => !isDeletedFlag(r.Delete_flag));
-    const deleted = (propAccounts || []).filter(r => isDeletedFlag(r.Delete_flag));
+    const active = (propAccounts || []).filter(r => !isDisplayDeleted(r));
+    const deleted = (propAccounts || []).filter(isDisplayDeleted);
     setAccounts(active);
     setDeletedAccounts(deleted);
     console.log('[CF] Client_Account propAccounts:', propAccounts);
@@ -1045,15 +1159,15 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName }) 
     });
   }, [propAccounts]);
 
-  async function fetchByDeleteFlag(shouldBeDeleted) {
+  async function fetchByStatusDeleted(shouldBeDeleted) {
     if (!ZOHO || !ZOHO.CRM || !ZOHO.CRM.API) return [];
     const perPage = 100;
     const all = [];
-    const deleteCriteria = shouldBeDeleted
-      ? '((Delete_flag:equals:true)or(Delete_flag:equals:True))'
-      : '((Delete_flag:equals:false)or(Delete_flag:equals:False))';
+    const statusCriteria = shouldBeDeleted
+      ? '((Display_Status:equals:Deleted)or(Display_Status:equals:deleted))'
+      : '((Display_Status:not_equal:Deleted)and(Display_Status:not_equal:deleted))';
     const contactCriteria = contactId ? '(' + F.clientId + ':equals:' + contactId + ')' : '';
-    const query = contactCriteria ? contactCriteria + 'and' + deleteCriteria : deleteCriteria;
+    const query = contactCriteria ? contactCriteria + 'and' + statusCriteria : statusCriteria;
 
     if (ZOHO.CRM.API.searchRecord) {
       for (let page = 1; page <= 10; page++) {
@@ -1062,7 +1176,7 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName }) 
           Type: 'criteria',
           Query: query,
         }, page, perPage);
-        console.log('[CF] Client_Account search query:', query);
+        console.log('[CF] Client_Account status search query:', query);
         console.log('[CF] Client_Account search response:', resp);
         const data = (resp && resp.data) || [];
         all.push(...data);
@@ -1083,7 +1197,7 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName }) 
         console.log('[CF] Client_Account getAllRecords response:', resp);
         const data = (resp && resp.data) || [];
         data.forEach(row => {
-          if (isDeletedFlag(row.Delete_flag) === shouldBeDeleted && matchesContact(row, contactId)) all.push(row);
+          if (isDisplayDeleted(row) === shouldBeDeleted && matchesContact(row, contactId)) all.push(row);
         });
         const more = resp && resp.info && resp.info.more_records;
         if (!more && data.length < perPage) break;
@@ -1096,8 +1210,8 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName }) 
 
   async function refreshAll() {
     const [active, deleted] = await Promise.all([
-      fetchByDeleteFlag(false),
-      fetchByDeleteFlag(true),
+      fetchByStatusDeleted(false),
+      fetchByStatusDeleted(true),
     ]);
     setAccounts(active);
     setDeletedAccounts(deleted);
@@ -1121,7 +1235,8 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName }) 
         setDeletedAccounts(prev => {
           const idSet = new Set(ids);
           const kept = prev.filter(r => !idSet.has(r.id));
-          return [...moved, ...kept];
+          const displayDeleted = moved.filter(isDisplayDeleted);
+          return [...displayDeleted, ...kept];
         });
       }
     } catch (e) { console.warn('delete error', e); }
@@ -1185,6 +1300,8 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName }) 
           onSaveRow={handleSaveRow}
           reasonOptions={reasonOptions}
           instructionOptions={instructionOptions}
+          dropdownOpen={dropdownOpen}
+          setDropdownOpen={setDropdownOpen}
         />
       ))}
       <SectionCard
@@ -1195,6 +1312,8 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName }) 
         onSaveRow={handleSaveRow}
         reasonOptions={reasonOptions}
         instructionOptions={instructionOptions}
+        dropdownOpen={dropdownOpen}
+        setDropdownOpen={setDropdownOpen}
         readOnly={true}
       />
     </div>

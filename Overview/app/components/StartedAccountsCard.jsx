@@ -55,7 +55,7 @@ function mapStartedAccount(row) {
     type: startedStr(row.Account_Type || row.Type || row.Block_Type) || '-',
     bureau: startedStr(row.Creditor || row.Bureau || row.Credit_Bureau) || '-',
     balance: formatStartedMoney(row.Credit_Balance || row.Balance),
-    limit: formatStartedMoney(row.Credit_Limit || row.Limit || row.High_Credit),
+    // limit: formatStartedMoney(row.Credit_Limit || row.Limit || row.High_Credit),
     status: startedStr(row.Display_Status || row.Dispute_Status || row.Status) || '-',
   };
 }
@@ -173,7 +173,8 @@ function StartedAccountsCard() {
       });
   }
 
-  const headers = ['Account Name', 'Type', 'Bureau', 'Balance', 'Limit', 'Status', 'Actions'];
+  // const headers = ['Account Name', 'Type', 'Bureau', 'Balance', 'Limit', 'Status', 'Actions'];
+  const headers = ['Account Name', 'Type', 'Bureau', 'Balance', 'Status', 'Actions'];
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm pt-5 pb-4">
@@ -241,7 +242,7 @@ function StartedAccountsCard() {
           <tbody>
             {!loading && accounts.length === 0 && (
               <tr>
-                <td colSpan={7} className="py-8 text-center text-sm text-gray-400">No accounts</td>
+                <td colSpan={6} className="py-8 text-center text-sm text-gray-400">No accounts</td>
               </tr>
             )}
             {accounts.map(acc => (
@@ -250,9 +251,8 @@ function StartedAccountsCard() {
                 <td className="py-3.5 pl-5 pr-6 text-[15px] text-gray-600">{acc.type}</td>
                 <td className="py-3.5 pl-5 pr-6 text-[15px] text-gray-600">{acc.bureau}</td>
                 <td className="py-3.5 pl-5 pr-6 text-[15px] text-gray-600">{acc.balance}</td>
-                <td className="py-3.5 pl-5 pr-6 text-[15px] text-gray-600">{acc.limit}</td>
-                <td className="py-3.5 pl-5 pr-6">
-                  <span className="text-[13px] font-semibold text-green-700 bg-green-100 px-2.5 py-1 rounded-full">
+                <td className="py-3.5 pl-5 pr-6 whitespace-nowrap">
+                  <span className="inline-flex min-w-max items-center whitespace-nowrap text-[13px] font-semibold text-green-700 bg-green-100 px-2.5 py-1 rounded-full">
                     {acc.status}
                   </span>
                 </td>

@@ -99,6 +99,46 @@ function useDynamicHeight() {
     let timer;
     const settleTimers = [];
     let readyTimer;
+    let animationFrame;
+    let lastSentHeight = 0;
+
+    function resizeZoho(height) {
+      if (window.ZOHO && window.ZOHO.CRM && window.ZOHO.CRM.UI && window.ZOHO.CRM.UI.Resize) {
+        window.ZOHO.CRM.UI.Resize({ height: String(height), width: '0' });
+      }
+    }
+
+    function animateResize(targetHeight) {
+      cancelAnimationFrame(animationFrame);
+
+      if (!lastSentHeight || targetHeight <= lastSentHeight) {
+        lastSentHeight = targetHeight;
+        resizeZoho(targetHeight);
+        return;
+      }
+
+      const startHeight = lastSentHeight;
+      const delta = targetHeight - startHeight;
+      const duration = 260;
+      const startedAt = performance.now();
+
+      function step(now) {
+        const progress = Math.min((now - startedAt) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        const nextHeight = Math.ceil(startHeight + delta * eased);
+
+        resizeZoho(nextHeight);
+        lastSentHeight = nextHeight;
+
+        if (progress < 1) {
+          animationFrame = requestAnimationFrame(step);
+        } else {
+          lastSentHeight = targetHeight;
+        }
+      }
+
+      animationFrame = requestAnimationFrame(step);
+    }
 
     function measureHeight() {
       const root = document.getElementById('root');
@@ -124,9 +164,7 @@ function useDynamicHeight() {
       const measured = Math.max(measuredRootHeight, measuredContentHeight);
       const h = Math.ceil(measured + paddingTop + paddingBottom + 40);
 
-      if (window.ZOHO && window.ZOHO.CRM && window.ZOHO.CRM.UI && window.ZOHO.CRM.UI.Resize) {
-        window.ZOHO.CRM.UI.Resize({ height: String(h), width: '0' });
-      }
+      animateResize(h);
     }
 
     function sendResize() {
@@ -171,6 +209,7 @@ function useDynamicHeight() {
 
     return () => {
       observer.disconnect();
+      cancelAnimationFrame(animationFrame);
       clearTimeout(timer);
       clearTimeout(readyTimer);
       settleTimers.forEach(clearTimeout);
@@ -197,30 +236,29 @@ const MainWidget = () => {
         </div>
 
         <CreditBureauReportsCard />
+        <StartedAccountsCard />
         <AlertcontrolPanelCard />
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
           <div className="space-y-4">
             <LogginCredentialsCard stretch />
-            <MessageTemplatesCard />
           </div>
 
           <div className="space-y-4">
-            <BillingNotesCard />
-            <TotalBalanceCard />
             <ReferralCreditsCard />
           </div>
         </div>
-
-        <StartedAccountsCard />
       </div>
 
       <div className="space-y-4">
         <CommentsCard />
+        <MessageTemplatesCard />
         <CreditBureauAutomationCard />
         <ProgramEligibilityCard />
         <ActivitiesCard />
         <AccountsCountChart />
+        <BillingNotesCard />
+        <TotalBalanceCard />
       </div>
     </div>
   );

@@ -3,60 +3,15 @@ const { useState, useEffect } = React;
 
 // 6 color palette that repeats
 const colors = [
-  'linear-gradient(135deg, #eef4ff 0%, #f6f8ff 100%)',
-  'linear-gradient(135deg, #e9fbff 0%, #f4fdff 100%)',
-  'linear-gradient(135deg, #fff8e9 0%, #fffdf3 100%)',
-  'linear-gradient(135deg, #fff0ef 0%, #fff8f7 100%)',
-  'linear-gradient(135deg, #fffaf1 0%, #fffef7 100%)',
-  'linear-gradient(135deg, #f7edff 0%, #fcf7ff 100%)',
+  'rgba(238, 244, 255, 0.68)',
+  'rgba(235, 251, 252, 0.68)',
+  'rgba(255, 250, 240, 0.68)',
+  'rgba(255, 240, 239, 0.68)',
+  'rgba(255, 253, 242, 0.68)',
+  'rgba(251, 240, 255, 0.68)',
 ];
 
 const MODULE_NAME = 'Monitoring_Log_In';
-
-const defaultCards = [
-  {
-    id: 1,
-    Name1: 'Credit Monitoring Login',
-    Password: 'greatapp',
-    Name: 'johndoe@creditrepairyourselfapp.com',
-    Note: 'test',
-  },
-  {
-    id: 2,
-    Name1: 'Equifax Login',
-    Password: 'greatapp',
-    Name: 'johndoe@creditrepairyourselfapp.com',
-    Note: 'test',
-  },
-  {
-    id: 3,
-    Name1: 'Transunion Login',
-    Password: 'greatapp',
-    Name: 'johndoe@creditrepairyourselfapp.com',
-    Note: 'test',
-  },
-  {
-    id: 4,
-    Name1: 'Experian Monitoring Login',
-    Password: 'greatapp',
-    Name: 'johndoe@creditrepairyourselfapp.com',
-    Note: 'test',
-  },
-  {
-    id: 5,
-    Name1: 'Client Portal Login',
-    Password: 'greatapp',
-    Name: 'johndoe@creditrepairyourselfapp.com',
-    Note: 'test',
-  },
-  {
-    id: 6,
-    Name1: 'Next Charge Date',
-    Password: 'greatapp',
-    Name: 'johndoe@creditrepairyourselfapp.com',
-    Note: 'test',
-  },
-];
 
 const hasZohoApi = () => (
   typeof ZOHO !== 'undefined' &&
@@ -89,6 +44,15 @@ function DetailRow({ label, value }) {
 }
 
 function CredentialCard({ card, index, onEdit, onDelete }) {
+  const details = [
+    // ['URL', card.URL],
+    ['Username', card.Name],
+    ['Password', card.Password],
+    // ['Last Import', card.Last_Import],
+    // ['Import Status', card.Import_Status],
+    ['Notes', card.Note],
+  ];
+
   return (
     <article
       className="card group relative"
@@ -123,16 +87,16 @@ function CredentialCard({ card, index, onEdit, onDelete }) {
       <div className="relative z-10 flex h-full flex-col">
         <div className="flex items-start justify-between gap-4 pr-16">
           <div className="flex-1 min-w-0">
-            <h2 className="card-title text-[1.35rem] font-bold text-slate-900 break-all whitespace-normal">
+            <h2 className="card-title text-[1.35rem] font-bold text-slate-800 break-all whitespace-normal">
               {card.Name1}
             </h2>
           </div>
         </div>
 
-        <div className="mt-6 rounded-2xl bg-white/55 p-4 backdrop-blur-sm">
-          <DetailRow label="User Name" value={card.Name} />
-          <DetailRow label="Password" value={card.Password} />
-          <DetailRow label="Note" value={card.Note} />
+        <div className="mt-7 space-y-1">
+          {details.map(([label, value]) => (
+            <DetailRow key={label} label={label} value={value || '-'} />
+          ))}
         </div>
       </div>
     </article>
@@ -317,8 +281,66 @@ function MonitoringModal({ isOpen, onClose, onSave, editingCard }) {
   );
 }
 
+function useDynamicHeight() {
+  useEffect(() => {
+    let timer;
+
+    function sendResize() {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const root = document.getElementById('root');
+        if (!root) return;
+
+        const bodyStyle = window.getComputedStyle(document.body);
+        const paddingTop = parseFloat(bodyStyle.paddingTop || 0);
+        const paddingBottom = parseFloat(bodyStyle.paddingBottom || 0);
+        const rootRect = root.getBoundingClientRect();
+        const measuredRootHeight = Math.max(
+          root.scrollHeight,
+          root.offsetHeight,
+          rootRect.height
+        );
+        const h = Math.ceil(measuredRootHeight + paddingTop + paddingBottom + 40);
+
+        if (window.ZOHO && window.ZOHO.CRM && window.ZOHO.CRM.UI && window.ZOHO.CRM.UI.Resize) {
+          window.ZOHO.CRM.UI.Resize({ height: String(h), width: '0' });
+        }
+      }, 150);
+    }
+
+    function burstResize() {
+      sendResize();
+      requestAnimationFrame(sendResize);
+      [300, 800, 1500, 3000].forEach(delay => setTimeout(sendResize, delay));
+    }
+
+    const root = document.getElementById('root');
+    const observer = window.ResizeObserver ? new ResizeObserver(sendResize) : null;
+    if (root && observer) observer.observe(root);
+
+    window.MonitorLoginWidget = window.MonitorLoginWidget || {};
+    window.MonitorLoginWidget.requestResize = sendResize;
+
+    burstResize();
+    window.addEventListener('resize', sendResize);
+    window.addEventListener('load', burstResize);
+
+    return () => {
+      if (observer) observer.disconnect();
+      clearTimeout(timer);
+      window.removeEventListener('resize', sendResize);
+      window.removeEventListener('load', burstResize);
+      if (window.MonitorLoginWidget) {
+        window.MonitorLoginWidget.requestResize = function () {};
+      }
+    };
+  }, []);
+}
+
 function App() {
-  const [cards, setCards] = useState(defaultCards);
+  useDynamicHeight();
+
+  const [cards, setCards] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -327,7 +349,9 @@ function App() {
 
   const fetchRecords = (recordId) => {
     if (!hasZohoApi()) {
+      setCards([]);
       setIsLoading(false);
+      setLoadError('Zoho CRM API is not available.');
       return;
     }
 
@@ -351,12 +375,14 @@ function App() {
         const mapped = records.map(record => ({
           id: record.id,
           Name1: record.Name1 || '',
+          // URL: record.URL || record.Url || record.url || '',
           Name: record.Name || '',
           Password: record.Password || '',
-          Note: record.Note || '',
+          // Last_Import: record.Last_Import || record.Last_import || record.Last_Imported || record.Last_Import_Time || '',
+          // Import_Status: record.Import_Status || record.Import_status || record.Status || '',
+          Note: record.Note || record.Notes || '',
         }));
         setCards(mapped);
-        console.log('Fetched records:', mapped);
       })
       .catch((err) => {
         console.error('Failed to load Monitoring Log In records:', err);
@@ -383,19 +409,7 @@ function App() {
 
   const handleSaveCard = (formData) => {
     if (!hasZohoApi()) {
-      if (editingCard) {
-        setCards(cards.map(card => (
-          card.id === editingCard.id ? { ...card, ...formData } : card
-        )));
-      } else {
-        const newCard = {
-          id: Math.max(...cards.map(c => c.id), 0) + 1,
-          ...formData,
-        };
-        setCards([...cards, newCard]);
-      }
-      setIsModalOpen(false);
-      setEditingCard(null);
+      setLoadError('Zoho CRM API is not available.');
       return;
     }
 
@@ -440,7 +454,7 @@ function App() {
 
   const handleDeleteCard = (id) => {
     if (!hasZohoApi()) {
-      setCards(cards.filter(card => card.id !== id));
+      setLoadError('Zoho CRM API is not available.');
       return;
     }
 
@@ -470,50 +484,46 @@ function App() {
 
   return (
     <main className="app-shell">
-      <div className="mx-auto flex min-h-[calc(100vh-48px)] w-full max-w-[1600px] flex-col gap-6">
-        <div className="glass-panel rounded-[28px] px-6 py-6">
-          <div className="flex flex-col gap-4 pb-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="page-title text-3xl font-bold text-slate-900 sm:text-4xl">
-                Monitoring Log In
-              </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
-                A card-based login monitoring dashboard for the <span className="font-semibold text-slate-800">Monitoring Log-In</span> module.
-                Replace the sample values with live API data when you provide the field mappings.
-              </p>
-            </div>
-            <button
-              onClick={handleOpenAddModal}
-              type="button"
-              className="inline-flex items-center gap-3 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition-transform hover:-translate-y-0.5 hover:bg-slate-800"
-            >
-              <span className="flex h-5 w-5 items-center justify-center rounded-full border border-white/30 text-lg leading-none">+</span>
-              Add Another Monitoring
-            </button>
-          </div>
-
-          {loadError && (
-            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {loadError}
-            </div>
-          )}
-
-          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {isLoading ? (
-              <div className="col-span-full text-sm text-slate-600">Loading records...</div>
-            ) : (
-              cards.map((card, index) => (
-                <CredentialCard 
-                  key={card.id} 
-                  card={card} 
-                  index={index}
-                  onEdit={handleEditCard}
-                  onDelete={handleDeleteCard}
-                />
-              ))
-            )}
-          </section>
+      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6">
+        <div className="flex flex-col gap-4 pb-5 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="page-title text-4xl font-bold text-slate-900">
+            Log In Credentials
+          </h1>
+          <button
+            onClick={handleOpenAddModal}
+            type="button"
+            className="inline-flex items-center gap-3 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition-transform hover:-translate-y-0.5 hover:bg-slate-800"
+          >
+            <span className="flex h-5 w-5 items-center justify-center rounded-full border border-white/30 text-lg leading-none">+</span>
+            Add Another Monitoring
+          </button>
         </div>
+
+        {loadError && (
+          <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {loadError}
+          </div>
+        )}
+
+        <section className="card-grid">
+          {isLoading ? (
+            <div className="col-span-full text-sm text-slate-600">Loading records...</div>
+          ) : cards.length === 0 ? (
+            <div className="col-span-full rounded-2xl border border-slate-200 bg-white/60 px-4 py-6 text-center text-sm text-slate-600">
+              No monitoring logins found.
+            </div>
+          ) : (
+            cards.map((card, index) => (
+              <CredentialCard
+                key={card.id}
+                card={card}
+                index={index}
+                onEdit={handleEditCard}
+                onDelete={handleDeleteCard}
+              />
+            ))
+          )}
+        </section>
       </div>
 
       <MonitoringModal 

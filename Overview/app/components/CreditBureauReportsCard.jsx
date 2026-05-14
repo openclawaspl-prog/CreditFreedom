@@ -30,7 +30,7 @@ function SpeedometerGauge({ value, max, gradientId }) {
   const ny = cy + needleLen * Math.sin(needleAngle);
 
   return (
-    <svg viewBox="0 0 120 100" style={{ width: '100%', height: 'auto' }} aria-hidden="true">
+    <svg viewBox="0 0 120 100" className="block h-full w-full" aria-hidden="true">
       <defs>
         <linearGradient id={gradientId} x1="10" y1="0" x2="110" y2="0" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stopColor="#991b1b" />
@@ -88,8 +88,10 @@ function BureauCol({ name, score, max, gaugeId }) {
     <div className="flex h-full w-full min-w-0 flex-col">
       <p className="text-sm font-semibold text-gray-700">{name}</p>
 
-      <div className="flex h-[265px] items-center px-1">
-        <SpeedometerGauge value={score} max={max} gradientId={gaugeId} />
+      <div className="flex h-[270px] items-center justify-center px-1">
+        <div className="h-[250px] w-[300px] max-w-full">
+          <SpeedometerGauge value={score} max={max} gradientId={gaugeId} />
+        </div>
       </div>
 
       <div className="mt-auto">
@@ -161,7 +163,7 @@ function CreditBureauReportsCard() {
       )}
       <div className="grid grid-cols-1 divide-y divide-gray-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
         {bureaus.map((b, i) => (
-          <div key={b.name} className="py-4 first:pt-0 last:pb-0 sm:flex sm:px-5 sm:py-0 sm:first:pl-0 sm:last:pr-0">
+          <div key={b.name} className="py-4 first:pt-0 last:pb-0 sm:flex sm:px-5 sm:py-0">
             <BureauCol {...b} max={MAX_SCORE} gaugeId={`gauge-${i}`} />
           </div>
         ))}

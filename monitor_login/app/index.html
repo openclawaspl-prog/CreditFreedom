@@ -5,11 +5,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Monitoring Log In</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap"
-    rel="stylesheet" />
   <script>
     window.__cfNativeAddEventListener = window.addEventListener;
     window.addEventListener = function (type, listener, options) {
@@ -44,111 +39,101 @@
       min-height: 100%;
     }
 
+    html {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
     body {
       margin: 0;
+      overflow: hidden;
       font-family: Inter, system-ui, sans-serif;
       color: var(--text);
       background:
-        radial-gradient(circle at top left, rgba(125, 147, 255, 0.22), transparent 32%),
-        radial-gradient(circle at top right, rgba(140, 224, 214, 0.20), transparent 28%),
-        linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+        radial-gradient(circle at 8% 10%, rgba(99, 102, 241, 0.16), transparent 28rem),
+        radial-gradient(circle at 90% 8%, rgba(45, 212, 191, 0.18), transparent 30rem),
+        linear-gradient(90deg, rgba(215, 221, 255, 0.74) 0%, rgba(255, 255, 255, 0.96) 26%, rgba(255, 255, 255, 0.96) 74%, rgba(219, 249, 250, 0.78) 100%);
+      background-attachment: fixed;
+    }
+
+    #root {
+      position: relative;
+      z-index: 1;
     }
 
     .app-shell {
       position: relative;
-      min-height: 100vh;
       padding: 24px;
       overflow: hidden;
     }
 
-    .app-shell::before,
-    .app-shell::after {
-      content: "";
-      position: fixed;
-      inset: auto;
-      pointer-events: none;
-      border-radius: 999px;
-      filter: blur(10px);
-      opacity: 0.85;
-    }
-
-    .app-shell::before {
-      width: 180px;
-      height: 180px;
-      top: -50px;
-      right: 20px;
-      background: rgba(66, 87, 255, 0.08);
-    }
-
-    .app-shell::after {
-      width: 240px;
-      height: 240px;
-      bottom: -90px;
-      left: -70px;
-      background: rgba(255, 177, 177, 0.12);
-    }
-
-    .glass-panel {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(18px);
-    }
-
     .page-title {
-      font-family: "Space Grotesk", Inter, system-ui, sans-serif;
-      letter-spacing: -0.04em;
+      font-family: Inter, system-ui, sans-serif;
+      letter-spacing: 0;
     }
 
     .card-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 18px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 24px;
     }
 
     .card {
       position: relative;
-      min-height: 296px;
-      border-radius: 20px;
-      padding: 22px 22px 20px;
-      border: 1px solid rgba(20, 24, 33, 0.05);
-      box-shadow: 0 16px 40px rgba(17, 24, 39, 0.06);
+      min-height: 284px;
+      border-radius: 12px;
+      padding: 28px 28px 26px;
+      border: 1px solid rgba(255, 255, 255, 0.56);
+      box-shadow:
+        0 22px 46px rgba(15, 23, 42, 0.10),
+        inset 0 1px 0 rgba(255, 255, 255, 0.78);
+      backdrop-filter: blur(18px) saturate(145%);
+      -webkit-backdrop-filter: blur(18px) saturate(145%);
       overflow: hidden;
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.62), transparent 44%),
+        linear-gradient(315deg, rgba(255, 255, 255, 0.26), transparent 52%);
+      opacity: 0.78;
     }
 
     .card::after {
       content: "";
       position: absolute;
-      inset: auto -20px -18px auto;
-      width: 120px;
-      height: 120px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.28);
-      filter: blur(2px);
+      inset: auto 18px 0;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.74);
     }
 
     .card-title {
-      font-family: "Space Grotesk", Inter, system-ui, sans-serif;
-      letter-spacing: -0.03em;
+      font-family: Inter, system-ui, sans-serif;
+      letter-spacing: 0;
     }
 
     .detail-row {
       display: grid;
-      grid-template-columns: 118px minmax(0, 1fr);
+      grid-template-columns: 116px minmax(0, 1fr);
       gap: 12px;
       align-items: start;
-      padding: 10px 0;
+      padding: 8px 0;
     }
 
     .detail-label {
-      color: rgba(20, 24, 33, 0.65);
-      font-size: 0.92rem;
-      line-height: 1.4;
+      color: rgba(20, 24, 33, 0.9);
+      font-size: 0.95rem;
+      line-height: 1.45;
     }
 
     .detail-value {
       font-size: 1rem;
-      font-weight: 600;
+      font-weight: 700;
       color: rgba(20, 24, 33, 0.92);
       word-break: break-word;
     }
@@ -159,7 +144,20 @@
       }
 
       .detail-row {
-        grid-template-columns: 90px minmax(0, 1fr);
+        grid-template-columns: 96px minmax(0, 1fr);
+        gap: 10px;
+      }
+    }
+
+    @media (max-width: 1100px) {
+      .card-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 720px) {
+      .card-grid {
+        grid-template-columns: 1fr;
       }
     }
   </style>

@@ -1,12 +1,27 @@
 const { useState: useBillingState } = React;
 
 function BillingNotesCard() {
-  const [category, setCategory] = useBillingState('Happy');
+  const [selectedTypes, setSelectedTypes] = useBillingState(['Happy']);
   const [notes,    setNotes]    = useBillingState('');
   const [saving,   setSaving]   = useBillingState(false);
   const [saved,    setSaved]    = useBillingState(false);
 
-  const categories = ['Happy', 'Neutral', 'Unhappy', 'VIP', 'At Risk'];
+  const noteTypes = [
+    'Unhappy (Not satisfied with results)',
+    'Happy',
+    'Nasty (Mean and Unpleasant)',
+    'Cancelled (Stop Paying)',
+    'Good Referrer',
+    'Other',
+  ];
+
+  function toggleType(type) {
+    setSelectedTypes(prev => (
+      prev.includes(type)
+        ? prev.filter(item => item !== type)
+        : [...prev, type]
+    ));
+  }
 
   function handleSave() {
     if (!notes.trim()) return;
@@ -16,23 +31,21 @@ function BillingNotesCard() {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4 flex flex-col h-full">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4">
       <h2 className="text-base font-bold text-gray-900 mb-4">Billing Notes</h2>
 
-      {/* Category dropdown */}
-      <div className="relative mb-3">
-        <select
-          value={category}
-          onChange={e => setCategory(e.target.value)}
-          className="w-full appearance-none border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-violet-400 cursor-pointer pr-8"
-        >
-          {categories.map(c => <option key={c}>{c}</option>)}
-        </select>
-        <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2">
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </div>
+      <div className="grid grid-cols-1 gap-y-2 mb-3">
+        {noteTypes.map(type => (
+          <label key={type} className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={selectedTypes.includes(type)}
+              onChange={() => toggleType(type)}
+              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-violet-600 focus:ring-violet-400"
+            />
+            <span className="leading-snug">{type}</span>
+          </label>
+        ))}
       </div>
 
       {/* Textarea */}
@@ -40,7 +53,7 @@ function BillingNotesCard() {
         value={notes}
         onChange={e => setNotes(e.target.value)}
         placeholder="Add billing notes or payment Login Credentials..."
-        className="flex-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 resize-none focus:outline-none focus:ring-2 focus:ring-violet-400 min-h-[120px]"
+        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 resize-none focus:outline-none focus:ring-2 focus:ring-violet-400 min-h-[120px]"
       />
 
       {/* Save button */}

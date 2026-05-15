@@ -59,7 +59,7 @@ function normalizeValue(value) {
 
 function FieldRow({ label, value, multiLine = false }) {
   return (
-    <div className="grid grid-cols-[170px_1fr] items-start gap-3 py-2">
+    <div className="grid grid-cols-[150px_1fr] items-start gap-3 py-1.5">
       <span className="text-sm text-gray-500 whitespace-nowrap">{label}</span>
       <span
         className={`text-sm text-gray-800 break-words ${
@@ -77,8 +77,8 @@ function LogginCredentialsCard({ stretch = false } = {}) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const containerClass = `flex flex-col gap-4 w-full${stretch ? ' h-full' : ''}`;
-  const cardClass = `bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4 w-full${stretch ? ' flex-1' : ''}`;
+  const containerClass = 'flex flex-col gap-3 w-full pb-3';
+  const cardClass = 'bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-6 pb-8 w-full';
 
   useEffect(() => {
     return window.OverviewWidget.onPageLoad((data) => {
@@ -117,7 +117,7 @@ function LogginCredentialsCard({ stretch = false } = {}) {
 
   if (error) {
     return (
-    <div className={`bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-8 text-center w-full${stretch ? ' h-full' : ''}`}>
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-8 text-center w-full">
         <p className="text-sm text-red-500">{error}</p>
       </div>
     );

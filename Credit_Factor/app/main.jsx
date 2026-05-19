@@ -116,12 +116,12 @@ function buildCreditFactorStats(records) {
     },
     {
       title: 'Credit card use',
-      value: sumField(records, 'Credit_card_use'),
+      value: sumField(records, 'Credit_Card_Use'),
       note: "How much credit you're using compared to your total limits",
     },
     {
       title: 'Payment history',
-      value: latestText(records, 'Payment_history'),
+      value: latestText(records, 'Payment_History'),
       note: "Percentage of payments you've made on time",
     },
   ];

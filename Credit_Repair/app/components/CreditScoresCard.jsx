@@ -49,6 +49,84 @@ function SpeedometerGauge({ score, max, uid }) {
   );
 }
 
+function toCreditScore(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 0;
+  return Math.max(0, number);
+}
+
+function normalizeCreditScoreBureau(value) {
+  const text = String(value || '').trim().toLowerCase().replace(/[\s_-]+/g, '');
+  if (text === 'equifax') return 'Equifax';
+  if (text === 'experian') return 'Experian';
+  if (text === 'transunion') return 'TransUnion';
+  return '';
+}
+
+function getCreditScoreRecordTime(record) {
+  const raw = record.Created_Time || record.CreatedTime || record.Modified_Time || '';
+  const time = raw ? new Date(raw).getTime() : 0;
+  return Number.isFinite(time) ? time : 0;
+}
+
+function normalizeCreditScoreClientId(value) {
+  if (!value) return '';
+  if (Array.isArray(value)) return normalizeCreditScoreClientId(value[0]);
+  if (typeof value === 'object') {
+    return String(value.id || value.ID || value.record_id || value.RecordID || '').trim();
+  }
+  return String(value).trim();
+}
+
+async function fetchLatestCreditScores(clientId) {
+  if (!clientId || !window.ZOHO || !ZOHO.CRM || !ZOHO.CRM.API || !ZOHO.CRM.API.searchRecord) {
+    return {};
+  }
+
+  const all = [];
+  const perPage = 200;
+  const query = `(Client:equals:${clientId})`;
+
+  for (let page = 1; page <= 10; page++) {
+    let resp;
+
+    try {
+      resp = await ZOHO.CRM.API.searchRecord({
+        Entity: 'Bureau_Score',
+        Type: 'criteria',
+        Query: query,
+        sort_by: 'Created_Time',
+        sort_order: 'desc',
+      }, page, perPage);
+    } catch (error) {
+      resp = await ZOHO.CRM.API.searchRecord({
+        Entity: 'Bureau_Score',
+        Type: 'criteria',
+        Query: query,
+      }, page, perPage);
+    }
+
+    const data = (resp && resp.data) || [];
+    all.push(...data);
+
+    const more = resp && resp.info && resp.info.more_records;
+    if (!more || data.length < perPage) break;
+  }
+
+  const latestScores = {};
+
+  all
+    .slice()
+    .sort((a, b) => getCreditScoreRecordTime(b) - getCreditScoreRecordTime(a))
+    .forEach((record) => {
+      const bureau = normalizeCreditScoreBureau(record.Creditor);
+      if (!bureau || Object.prototype.hasOwnProperty.call(latestScores, bureau)) return;
+      latestScores[bureau] = toCreditScore(record.Creditor_Score);
+    });
+
+  return latestScores;
+}
+
 function ScoreCol({ name, score, max, delta }) {
   const progress = Math.round((score / max) * 100);
   const positive = delta >= 0;
@@ -81,16 +159,56 @@ function ScoreCol({ name, score, max, delta }) {
   );
 }
 
-function CreditScoresCard({ record }) {
+function CreditScoresCard({ record, contactId }) {
   const MAX = 900;
+  const [scores, setScores] = React.useState({});
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState('');
+  const clientId = normalizeCreditScoreClientId(contactId);
+
+  React.useEffect(() => {
+    let alive = true;
+
+    if (!clientId) {
+      setScores({});
+      return () => { alive = false; };
+    }
+
+    setLoading(true);
+    setError('');
+
+    fetchLatestCreditScores(clientId)
+      .then((latestScores) => {
+        if (alive) setScores(latestScores);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setScores({});
+        setError('Failed to load credit scores.');
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [clientId]);
+
   const cols = [
-    { name: 'Equifax', score: Number(record.Equifax_Score) || 0, delta: Number(record.Equifax_Delta) || 0 },
-    { name: 'Experian', score: Number(record.Experin_Score) || 0, delta: Number(record.Experian_Delta) || 0 },
-    { name: 'TransUnion', score: Number(record.Transunion_Score) || 0, delta: Number(record.Transunion_Delta) || 0 },
+    { name: 'Equifax', score: toCreditScore(scores.Equifax), delta: Number(record.Equifax_Delta) || 0 },
+    { name: 'Experian', score: toCreditScore(scores.Experian), delta: Number(record.Experian_Delta) || 0 },
+    { name: 'TransUnion', score: toCreditScore(scores.TransUnion), delta: Number(record.Transunion_Delta) || 0 },
   ];
 
   return (
     <div className="cf-glass bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4">
+      {(loading || error) && (
+        <div className="mb-3 flex justify-end">
+          {loading && <span className="text-xs text-gray-400">Loading...</span>}
+          {!loading && error && <span className="text-xs text-red-500">{error}</span>}
+        </div>
+      )}
       <div className="flex gap-4">
         {cols.map((c, i) => (
           <React.Fragment key={c.name}>

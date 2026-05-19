@@ -43,9 +43,23 @@ const DT_SECTIONS = [
   { key: 'removed', label: 'Removed Account' },
 ];
 
+const COLLECTION_SECTIONS = [
+  { key: 'started', label: 'Started Collections', matchTagStarted: true },
+  { key: 'new', label: 'New Collections' },
+  { key: 'closed', label: 'Closed Collections' },
+  { key: 'collection', label: 'Collections' },
+];
+
+const COLLECTION_MOVE_OPTIONS = [
+  { key: 'new', label: 'New' },
+  { key: 'closed', label: 'Closed' },
+  { key: 'collection', label: 'Collection' },
+];
+
 /* Field API name map — single place to update */
 const F = {
   blockType: 'Block_Type',
+  tagValue: 'Tag_Value',
   Creditor: 'Creditor',
   date: 'Created_Time',
   creditorName: 'Creditor_Name',
@@ -59,6 +73,24 @@ const F = {
   balance: 'Credit_Balance',
   status: 'Dispute_Status',
   acctStatus: 'Display_Status',
+  inquiryName: 'Name',
+  inquiryDate: 'Inquiry_Date',
+  inquiryExpiryDate: 'Inquiry_Expiry_Date',
+  providedBy: 'Provided_By',
+  personalName: 'Name',
+  personalFieldValue: 'Field_Value',
+  personalUpdatedDate: 'Modified_Time',
+  personalIsDeleted: 'Is_Deleted',
+  personalClient: 'Client',
+  collectionName: 'Name',
+  collectionAgencyStatus: 'Agency_Status',
+  collectionAgencyBalance: 'Agency_Balance',
+  collectionRentalReason: 'Rental_Reason',
+  collectionRentalInstruction: 'Rental_Instruction',
+  collectionOriginalCreditor: 'Original_Creditor',
+  collectionOpenedDate: 'Opened_Date',
+  collectionClient: 'Client',
+  collectionBlockType: 'Bock_Type',
 };
 
 function dtFormatDate(v) {
@@ -106,6 +138,14 @@ function lookupId(val) {
   return String(val);
 }
 
+function getRowValue(row, apiName) {
+  if (!row || !apiName) return undefined;
+  if (Object.prototype.hasOwnProperty.call(row, apiName)) return row[apiName];
+  const wanted = String(apiName).toLowerCase();
+  const key = Object.keys(row).find(k => String(k).toLowerCase() === wanted);
+  return key ? row[key] : undefined;
+}
+
 function isDeletedFlag(val) {
   if (val === true) return true;
   if (val === false || val == null) return false;
@@ -124,19 +164,311 @@ function matchesContact(row, contactId) {
   return String(matchId) === String(contactId);
 }
 
+function normalizeInquiryClientId(value) {
+  if (!value) return '';
+  if (Array.isArray(value)) return normalizeInquiryClientId(value[0]);
+  if (typeof value === 'object') {
+    return String(value.id || value.ID || value.record_id || value.RecordID || '').trim();
+  }
+  return String(value).trim();
+}
+
+function isInquiryRowDeleted(row) {
+  return isDeletedFlag(row && row.Delete_flag) || isDisplayDeleted(row);
+}
+
+function isStartedInquiryRow(row) {
+  return dtStr(row && getRowValue(row, F.tagValue)).trim().toLowerCase() === 'started';
+}
+
+function uniqueInquiryRows(rows) {
+  const seen = new Set();
+  return (rows || []).filter(row => {
+    const key = String(row.id || row.ID || JSON.stringify(row));
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function isPicklistYes(val) {
+  return dtStr(val).trim().toLowerCase() === 'yes';
+}
+
+function uniqueRowsByRecordId(rows) {
+  const seen = new Set();
+  return (rows || []).filter(row => {
+    const key = String(row.id || row.ID || JSON.stringify(row));
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function normalizePersonalNameKey(value) {
+  const normalized = dtStr(value).trim().replace(/\s+/g, ' ').toLowerCase();
+  return normalized || 'unknown';
+}
+
+function displayPersonalName(value) {
+  const normalized = dtStr(value).trim().replace(/\s+/g, ' ');
+  if (!normalized) return 'Unknown';
+  return normalized
+    .split(' ')
+    .map(part => part ? part.charAt(0).toUpperCase() + part.slice(1).toLowerCase() : part)
+    .join(' ');
+}
+
+function groupPersonalRowsByName(rows) {
+  const groups = {};
+  uniqueRowsByRecordId(rows).forEach(row => {
+    const rawName = getRowValue(row, F.personalName);
+    const key = normalizePersonalNameKey(rawName);
+    if (!groups[key]) groups[key] = { name: displayPersonalName(rawName), rows: [] };
+    groups[key].rows.push(row);
+  });
+  return Object.keys(groups)
+    .sort((a, b) => groups[a].name.localeCompare(groups[b].name))
+    .map(key => groups[key]);
+}
+
+function collectionRowSectionKey(row) {
+  if (isStartedInquiryRow(row)) return 'started';
+  const rawKey = getRowValue(row, F.collectionBlockType) || getRowValue(row, F.blockType) || row.block_type || row.Block_Type || row.BlockType;
+  return dtStr(rawKey).trim().toLowerCase();
+}
+
+function groupCollectionRows(rows) {
+  const grouped = Object.fromEntries(COLLECTION_SECTIONS.map(s => [s.key, []]));
+  uniqueRowsByRecordId(rows).forEach(row => {
+    const key = collectionRowSectionKey(row);
+    if (grouped[key]) grouped[key].push(row);
+  });
+  return grouped;
+}
+
+async function searchInquiryRowsByField(contactId, field, value) {
+  if (!contactId || !window.ZOHO || !ZOHO.CRM || !ZOHO.CRM.API || !ZOHO.CRM.API.searchRecord) {
+    return [];
+  }
+
+  const all = [];
+  const perPage = 200;
+  const clientFields = ['Client', F.clientId];
+
+  for (const clientField of clientFields) {
+    all.length = 0;
+    const query = `(((${clientField}:equals:${contactId})and(${field}:equals:${value}))and(Delete_flag:equals:false))`;
+    console.log('[CF] Inquiry search query:', { clientField, field, value, query });
+
+    try {
+      for (let page = 1; page <= 10; page++) {
+        const resp = await ZOHO.CRM.API.searchRecord({
+          Entity: 'Inquiries',
+          Type: 'criteria',
+          Query: query,
+        }, page, perPage);
+
+        const data = (resp && resp.data) || [];
+        console.log('[CF] Inquiry search response:', { clientField, field, value, page, resp, data });
+        all.push(...data);
+
+        const more = resp && resp.info && resp.info.more_records;
+        if (!more || data.length < perPage) break;
+      }
+
+      if (all.length) {
+        const filtered = all.filter(row => !isInquiryRowDeleted(row));
+        console.log('[CF] Inquiry filtered rows:', { clientField, field, value, rows: filtered });
+        return filtered;
+      }
+    } catch (error) {
+      console.warn('[CF] Inquiry search failed:', query, error);
+    }
+  }
+
+  const filtered = all.filter(row => !isInquiryRowDeleted(row));
+  console.log('[CF] Inquiry filtered rows:', { field, value, rows: filtered });
+  return filtered;
+}
+
+async function fetchInquiryTables(contactId) {
+  const clientId = normalizeInquiryClientId(contactId);
+  if (!clientId) {
+    return { new: [], inquiry: [], started: [] };
+  }
+
+  const [newRows, inquiryRows, startedRows] = await Promise.all([
+    searchInquiryRowsByField(clientId, F.blockType, 'new'),
+    searchInquiryRowsByField(clientId, F.blockType, 'inquiry'),
+    searchInquiryRowsByField(clientId, F.tagValue, 'started'),
+  ]);
+
+  const tables = {
+    new: uniqueInquiryRows(newRows).filter(row => !isStartedInquiryRow(row)),
+    inquiry: uniqueInquiryRows(inquiryRows).filter(row => !isStartedInquiryRow(row)),
+    started: uniqueInquiryRows(startedRows),
+  };
+
+  console.log('[CF] Inquiry tables loaded:', tables);
+  return tables;
+}
+
+async function fetchPersonalDataRows(contactId) {
+  const clientId = normalizeInquiryClientId(contactId);
+  if (!clientId || !window.ZOHO || !ZOHO.CRM || !ZOHO.CRM.API) return [];
+
+  const perPage = 200;
+  const all = [];
+  const query = `((${F.personalClient}:equals:${clientId})and(Delete_flag:equals:false))`;
+
+  if (ZOHO.CRM.API.searchRecord) {
+    try {
+      for (let page = 1; page <= 10; page++) {
+        const resp = await ZOHO.CRM.API.searchRecord({
+          Entity: 'Personal_Data',
+          Type: 'criteria',
+          Query: query,
+        }, page, perPage);
+
+        const data = (resp && resp.data) || [];
+        console.log('[CF] Personal_Data search response:', { query, page, resp, data });
+        data.forEach(row => {
+          console.log('[CF] Personal_Data Modified_Time raw:', {
+            id: row.id || row.ID,
+            name: getRowValue(row, F.personalName),
+            modifiedTime: getRowValue(row, F.personalUpdatedDate),
+            row,
+          });
+        });
+        all.push(...data);
+
+        const more = resp && resp.info && resp.info.more_records;
+        if (!more || data.length < perPage) break;
+      }
+      return uniqueRowsByRecordId(all).filter(row => !isDeletedFlag(row.Delete_flag));
+    } catch (error) {
+      console.warn('[CF] Personal_Data search failed:', query, error);
+    }
+  }
+
+  if (ZOHO.CRM.API.getAllRecords) {
+    try {
+      for (let page = 1; page <= 10; page++) {
+        const resp = await ZOHO.CRM.API.getAllRecords({
+          Entity: 'Personal_Data',
+          page,
+          per_page: perPage,
+        });
+        const data = (resp && resp.data) || [];
+        data.forEach(row => {
+          console.log('[CF] Personal_Data Modified_Time raw:', {
+            id: row.id || row.ID,
+            name: getRowValue(row, F.personalName),
+            modifiedTime: getRowValue(row, F.personalUpdatedDate),
+            row,
+          });
+        });
+        data.forEach(row => {
+          const rowClient = getRowValue(row, F.personalClient) || row.Client_ID || row.Contact;
+          if (String(lookupId(rowClient)) === String(clientId) && !isDeletedFlag(row.Delete_flag)) {
+            all.push(row);
+          }
+        });
+
+        const more = resp && resp.info && resp.info.more_records;
+        if (!more || data.length < perPage) break;
+      }
+    } catch (error) {
+      console.warn('[CF] Personal_Data getAllRecords failed:', error);
+    }
+  }
+
+  return uniqueRowsByRecordId(all);
+}
+
+async function fetchCollectionRows(contactId) {
+  const clientId = normalizeInquiryClientId(contactId);
+  if (!clientId || !window.ZOHO || !ZOHO.CRM || !ZOHO.CRM.API) return [];
+
+  const perPage = 200;
+  const all = [];
+  const query = `((${F.collectionClient}:equals:${clientId})and(Delete_flag:equals:false))`;
+
+  if (ZOHO.CRM.API.searchRecord) {
+    try {
+      for (let page = 1; page <= 10; page++) {
+        const resp = await ZOHO.CRM.API.searchRecord({
+          Entity: 'Collection',
+          Type: 'criteria',
+          Query: query,
+        }, page, perPage);
+
+        const data = (resp && resp.data) || [];
+        console.log('[CF] Collection search response:', { query, page, resp, data });
+        all.push(...data);
+
+        const more = resp && resp.info && resp.info.more_records;
+        if (!more || data.length < perPage) break;
+      }
+      return uniqueRowsByRecordId(all).filter(row => !isDeletedFlag(row.Delete_flag));
+    } catch (error) {
+      console.warn('[CF] Collection search failed:', query, error);
+    }
+  }
+
+  if (ZOHO.CRM.API.getAllRecords) {
+    try {
+      for (let page = 1; page <= 10; page++) {
+        const resp = await ZOHO.CRM.API.getAllRecords({
+          Entity: 'Collection',
+          page,
+          per_page: perPage,
+        });
+        const data = (resp && resp.data) || [];
+        data.forEach(row => {
+          const rowClient = getRowValue(row, F.collectionClient) || row.Client_ID || row.Contact;
+          if (String(lookupId(rowClient)) === String(clientId) && !isDeletedFlag(row.Delete_flag)) {
+            all.push(row);
+          }
+        });
+
+        const more = resp && resp.info && resp.info.more_records;
+        if (!more || data.length < perPage) break;
+      }
+    } catch (error) {
+      console.warn('[CF] Collection getAllRecords failed:', error);
+    }
+  }
+
+  return uniqueRowsByRecordId(all);
+}
+
 function optionLabel(options, id) {
   const match = (options || []).find(opt => String(opt.id) === String(id));
   return match ? match.label : '';
 }
 
-async function fetchMasterOptions() {
+function masterInfoTypeValue(row) {
+  return dtStr(
+    getRowValue(row, 'Type_of_information') ||
+    getRowValue(row, 'Type_of_Information') ||
+    getRowValue(row, 'type_of_information')
+  ).trim();
+}
+
+async function fetchMasterOptions(typeName = 'Account') {
   if (!window.ZOHO || !ZOHO.CRM || !ZOHO.CRM.API) return [];
   const perPage = 200;
   const reasons = [];
   const instructions = [];
   const seenReasons = new Set();
   const seenInstructions = new Set();
-  const queryBase = '((Type_of_information:equals:Account)or(Type_of_information:equals:account))';
+  const infoType = String(typeName);
+  const infoTypeLower = infoType.toLowerCase();
+  const infoTypeCapitalized = infoTypeLower.charAt(0).toUpperCase() + infoTypeLower.slice(1);
+  const typeCandidates = typeName === 'Collection' ? ['Collections'] : ['Account'];
+  console.log(`[CF] Master_Reason_Instruction ${infoTypeCapitalized} type candidates:`, typeCandidates);
 
   function pushOption(list, seen, id, label) {
     if (!id) return;
@@ -146,50 +478,79 @@ async function fetchMasterOptions() {
     list.push({ id, label: label || '—' });
   }
 
-  function classifyRow(row) {
-    const typeVal = dtStr(row.Type || row.type || row.Type_of_information || row.type_of_information).trim().toLowerCase();
-    const reasonLabel = dtStr(row.Reason || row.reason || row.Name || row.name || row.display_value);
-    const instructionLabel = dtStr(row.Instruction || row.instruction || row.Name || row.name || row.display_value);
+  function rowMatchesInfoType(row) {
+    const typeVal = masterInfoTypeValue(row).toLowerCase();
+    return typeCandidates.map(v => String(v).toLowerCase()).includes(typeVal);
+  }
 
-    if (typeVal === 'reason' || typeVal === 'reasons') {
+  function classifyRow(row) {
+    const nameVal = dtStr(getRowValue(row, 'Name')).trim().toLowerCase();
+    const typeVal = dtStr(
+      getRowValue(row, 'Type') ||
+      getRowValue(row, 'Category') ||
+      getRowValue(row, 'Field_Type')
+    ).trim().toLowerCase();
+    const collectionNameClassifier = /\breason\b|\binstruction\b/.test(nameVal) ? nameVal : '';
+    const classifier = typeName === 'Collection' ? (collectionNameClassifier || typeVal) : typeVal;
+    const reasonLabel = dtStr(
+      getRowValue(row, 'Reason') ||
+      getRowValue(row, 'Display_Name') ||
+      getRowValue(row, 'Value') ||
+      getRowValue(row, 'Name') ||
+      row.display_value
+    );
+    const instructionLabel = dtStr(
+      getRowValue(row, 'Instruction') ||
+      getRowValue(row, 'Display_Name') ||
+      getRowValue(row, 'Value') ||
+      getRowValue(row, 'Name') ||
+      row.display_value
+    );
+
+    if (classifier === 'reason' || classifier === 'reasons' || /\breason\b/.test(classifier)) {
       pushOption(reasons, seenReasons, row.id, reasonLabel);
       return;
     }
 
-    if (typeVal === 'instruction' || typeVal === 'instructions') {
+    if (classifier === 'instruction' || classifier === 'instructions' || /\binstruction\b/.test(classifier)) {
       pushOption(instructions, seenInstructions, row.id, instructionLabel);
       return;
     }
 
-    if (row.Reason) pushOption(reasons, seenReasons, row.id, reasonLabel);
-    if (row.Instruction) pushOption(instructions, seenInstructions, row.id, instructionLabel);
+    if (getRowValue(row, 'Reason')) pushOption(reasons, seenReasons, row.id, reasonLabel);
+    if (getRowValue(row, 'Instruction')) pushOption(instructions, seenInstructions, row.id, instructionLabel);
   }
 
   if (ZOHO.CRM.API.searchRecord) {
     try {
-      for (let page = 1; page <= 5; page++) {
-        const resp = await ZOHO.CRM.API.searchRecord({
-          Entity: 'Master_Reason_Instruction',
-          Type: 'criteria',
-          Query: queryBase,
-        }, page, perPage);
+      for (const typeCandidate of typeCandidates) {
+        const query = `(Type_of_information:equals:${typeCandidate})`;
+        for (let page = 1; page <= 5; page++) {
+          const resp = await ZOHO.CRM.API.searchRecord({
+            Entity: 'Master_Reason_Instruction',
+            Type: 'criteria',
+            Query: query,
+          }, page, perPage);
 
-        const data = (resp && resp.data) || [];
-        data.forEach(row => {
-          console.log('[CF] Master_Reason_Instruction row:', row);
-          classifyRow(row);
-        });
+          const data = (resp && resp.data) || [];
+          console.log(`[CF] Master_Reason_Instruction ${infoTypeCapitalized} search:`, { query, page, resp, data });
+          data.forEach(row => {
+            console.log(`[CF] Master_Reason_Instruction ${infoTypeCapitalized} row:`, row);
+            classifyRow(row);
+          });
 
-        const more = resp && resp.info && resp.info.more_records;
-        if (!more && data.length < perPage) break;
-        if (data.length < perPage) break;
+          const more = resp && resp.info && resp.info.more_records;
+          if (!more || data.length < perPage) break;
+        }
+        if (reasons.length || instructions.length) break;
       }
     } catch (e) {
-      console.warn('[CF] Master_Reason_Instruction search failed. Falling back to getAllRecords.', e);
+      console.warn(`[CF] Master_Reason_Instruction ${infoTypeCapitalized} search failed. Falling back to getAllRecords.`, e);
     }
   }
 
   if (reasons.length === 0 && instructions.length === 0 && ZOHO.CRM.API.getAllRecords) {
+    const seenInfoTypes = new Set();
     for (let page = 1; page <= 5; page++) {
       const resp = await ZOHO.CRM.API.getAllRecords({
         Entity: 'Master_Reason_Instruction',
@@ -198,18 +559,23 @@ async function fetchMasterOptions() {
       });
       const data = (resp && resp.data) || [];
       data.forEach(row => {
-        console.log('[CF] Master_Reason_Instruction row:', row);
-        const typeVal = dtStr(row.Type_of_information || row.Type_of_Information || row.type_of_information);
-        const typeMatch = /account/i.test(typeVal || '');
-        if (typeMatch) classifyRow(row);
+        const infoTypeValue = masterInfoTypeValue(row);
+        if (infoTypeValue) seenInfoTypes.add(infoTypeValue);
+        console.log(`[CF] Master_Reason_Instruction ${infoTypeCapitalized} row:`, row);
+        if (rowMatchesInfoType(row)) classifyRow(row);
       });
 
       const more = resp && resp.info && resp.info.more_records;
       if (!more && data.length < perPage) break;
       if (data.length < perPage) break;
     }
+    console.log('[CF] Master_Reason_Instruction distinct Type_of_information values:', Array.from(seenInfoTypes));
   }
 
+  console.log(`[CF] Master_Reason_Instruction ${infoTypeCapitalized} options:`, {
+    reasons,
+    instructions,
+  });
   return { reasons, instructions };
 }
 
@@ -506,6 +872,11 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
   }, [bulkMoveOpen]);
 
   useDtEffect(() => {
+    if (!bulkMoveOpen || bulkMoveMenuStyle || !bulkMoveButtonRef.current) return;
+    setBulkMoveMenuStyle(buildBulkMoveMenuStyle(bulkMoveButtonRef.current));
+  }, [bulkMoveOpen, bulkMoveMenuStyle, sel.size]);
+
+  useDtEffect(() => {
     if (sel.size === 0) return;
     setMoveMenuOpen(false);
     setMoveRowId(null);
@@ -563,18 +934,18 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
   function buildMoveMenuStyle(triggerEl) {
     if (!triggerEl || !triggerEl.getBoundingClientRect) return null;
     const rect = triggerEl.getBoundingClientRect();
-    const menuWidth = 230;
-    const menuMaxHeight = 260;
+    const menuWidth = 180;
+    const menuMaxHeight = 190;
     const pad = 8;
-    let left = rect.right - menuWidth;
+    let left = rect.left;
     if (left < pad) left = pad;
     if (left + menuWidth > window.innerWidth - pad) {
       left = Math.max(pad, window.innerWidth - menuWidth - pad);
     }
 
-    let top = rect.bottom + 6;
+    let top = rect.bottom + 4;
     if (top + menuMaxHeight > window.innerHeight - pad) {
-      top = Math.max(pad, rect.top - menuMaxHeight - 6);
+      top = Math.max(pad, rect.top - menuMaxHeight - 4);
     }
 
     return {
@@ -585,6 +956,10 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
       maxHeight: menuMaxHeight,
       zIndex: 2147483647,
     };
+  }
+
+  function buildBulkMoveMenuStyle(triggerEl) {
+    return buildMoveMenuStyle(triggerEl);
   }
 
   function buildBulkMoveMenuStyle(triggerEl) {
@@ -1384,13 +1759,836 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
   );
 }
 
+function InquiryTableSection({ title, rows, loading }) {
+  const headers = ['Inquiry Name', 'Inquiry Date', 'Inquiry Expiry Date', 'Provided By'];
+
+  return (
+    <div
+      className="cf-glass cf-account-section rounded-xl border overflow-hidden relative bg-white"
+      style={{
+        borderColor: 'rgba(226, 232, 240, 0.9)',
+        boxShadow: '0 12px 34px rgba(15, 23, 42, 0.08)',
+      }}
+    >
+      <div
+        className="px-4 py-3 border-b flex items-center justify-between rounded-t-xl"
+        style={{ background: '#ffffff', borderColor: '#e5e7eb' }}
+      >
+        <span className="inline-flex items-center gap-2 text-sm font-bold text-slate-900 tracking-normal">
+          <span className="inline-block h-2 w-2 rounded-full bg-sky-500 shadow-sm" />
+          {title}
+        </span>
+        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-500">
+          {loading ? 'Loading...' : `${rows.length} record${rows.length !== 1 ? 's' : ''}`}
+        </span>
+      </div>
+
+      <div className="rounded-b-xl overflow-hidden bg-white">
+        <div
+          className="cf-glass-scroll overview-started-scroll"
+          style={{
+            overflowX: 'auto',
+            overflowY: 'auto',
+            background: '#ffffff',
+            maxHeight: 'calc(44px + (52px * 5))',
+            borderBottomLeftRadius: '0.75rem',
+            borderBottomRightRadius: '0.75rem',
+            scrollbarGutter: 'stable',
+          }}
+        >
+          <table
+            className="w-full"
+            style={{
+              fontSize: 13,
+              borderCollapse: 'separate',
+              borderSpacing: 0,
+              background: 'rgba(255, 255, 255, 0.72)',
+              minWidth: 760,
+              color: '#0f172a',
+            }}
+          >
+            <thead>
+              <tr>
+                {headers.map(header => (
+                  <th key={header} className="px-4 py-3 text-left whitespace-nowrap">
+                    {header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {!loading && rows.length === 0 && (
+                <tr>
+                  <td colSpan={headers.length} className="px-4 py-5 text-center text-xs text-gray-400 italic">
+                    No records
+                  </td>
+                </tr>
+              )}
+              {rows.map((row, index) => (
+                <tr key={row.id || row.ID || `${title}-${index}`}>
+                  <td className="px-4 py-3 text-left whitespace-nowrap" style={{ color: '#111827', fontWeight: 500 }}>
+                    {dtStr(row[F.inquiryName]) || '-'}
+                  </td>
+                  <td className="px-4 py-3 text-left whitespace-nowrap" style={{ color: '#111827', fontWeight: 400 }}>
+                    {dtFormatDateParts(row[F.inquiryDate]).date}
+                  </td>
+                  <td className="px-4 py-3 text-left whitespace-nowrap" style={{ color: '#111827', fontWeight: 400 }}>
+                    {dtFormatDateParts(row[F.inquiryExpiryDate]).date}
+                  </td>
+                  <td className="px-4 py-3 text-left whitespace-nowrap" style={{ color: '#111827', fontWeight: 500 }}>
+                    {dtStr(row[F.providedBy]) || '-'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Main exported component ─── */
+function PersonalDataTableSection({ title, fieldName, rows, loading, onDelete, readOnly = false }) {
+  const [busyId, setBusyId] = useDtState(null);
+  const headers = ['Reason', 'Instruction', fieldName, 'Creditor', 'Updated Date'].concat(readOnly ? [] : ['Action']);
+  const columnStyles = (readOnly ? [
+    { width: '20%' },
+    { width: '20%' },
+    { width: '30%' },
+    { width: '16%' },
+    { width: '14%' },
+  ] : [
+    { width: '18%' },
+    { width: '18%' },
+    { width: '26%' },
+    { width: '16%' },
+    { width: '14%' },
+    { width: '8%' },
+  ]);
+
+  async function handleDelete(row) {
+    const id = row && (row.id || row.ID);
+    if (!id) return;
+    setBusyId(id);
+    await onDelete(id);
+    setBusyId(null);
+  }
+
+  return (
+    <div
+      className="cf-glass cf-account-section rounded-xl border overflow-hidden relative bg-white"
+      style={{
+        borderColor: 'rgba(226, 232, 240, 0.9)',
+        boxShadow: '0 12px 34px rgba(15, 23, 42, 0.08)',
+      }}
+    >
+      <div
+        className="px-4 py-3 border-b flex items-center justify-between rounded-t-xl"
+        style={{ background: '#ffffff', borderColor: '#e5e7eb' }}
+      >
+        <span className="inline-flex items-center gap-2 text-sm font-bold text-slate-900 tracking-normal">
+          <span className="inline-block h-2 w-2 rounded-full bg-sky-500 shadow-sm" />
+          {title}
+        </span>
+        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-500">
+          {loading ? 'Loading...' : `${rows.length} record${rows.length !== 1 ? 's' : ''}`}
+        </span>
+      </div>
+
+      <div className="rounded-b-xl overflow-hidden bg-white">
+        <div
+          style={{
+            overflow: 'visible',
+            background: '#ffffff',
+            borderBottomLeftRadius: '0.75rem',
+            borderBottomRightRadius: '0.75rem',
+          }}
+        >
+          <table
+            className="w-full"
+            style={{
+              fontSize: 13,
+              tableLayout: 'fixed',
+              borderCollapse: 'separate',
+              borderSpacing: 0,
+              background: 'rgba(255, 255, 255, 0.72)',
+              width: '100%',
+              color: '#0f172a',
+            }}
+          >
+            <colgroup>
+              {columnStyles.map((style, index) => (
+                <col key={index} style={style} />
+              ))}
+            </colgroup>
+            <thead>
+              <tr>
+                {headers.map(header => (
+                  <th
+                    key={header}
+                    className="px-3 py-3 text-left"
+                    style={{
+                      maxWidth: '100%',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                    title={header}
+                  >
+                    {header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {!loading && rows.length === 0 && (
+                <tr>
+                  <td colSpan={headers.length} className="px-4 py-5 text-center text-xs text-gray-400 italic">
+                    No records
+                  </td>
+                </tr>
+              )}
+              {rows.map((row, index) => {
+                const rowId = row.id || row.ID || `${title}-${index}`;
+                return (
+                  <tr key={rowId}>
+                    <td className="px-3 py-3 text-left" style={{ color: '#111827', fontWeight: 500, maxWidth: 0, overflowWrap: 'anywhere' }}>
+                      {dtStr(getRowValue(row, F.reason)) || '-'}
+                    </td>
+                    <td className="px-3 py-3 text-left" style={{ color: '#111827', fontWeight: 500, maxWidth: 0, overflowWrap: 'anywhere' }}>
+                      {dtStr(getRowValue(row, F.instruction)) || '-'}
+                    </td>
+                    <td className="px-3 py-3 text-left" style={{ color: '#111827', fontWeight: 500, maxWidth: 0, overflowWrap: 'anywhere' }}>
+                      {dtStr(getRowValue(row, F.personalFieldValue)) || '-'}
+                    </td>
+                    <td className="px-3 py-3 text-left">
+                      {(() => {
+                        const creditor = getRowValue(row, F.Creditor) || '-';
+                        const badge = creditorBadgeStyle(creditor);
+                        return (
+                          <span
+                            className="inline-flex items-center justify-center rounded-full border px-2.5 py-1 text-xs font-semibold shadow-sm"
+                            title={dtStr(creditor)}
+                            style={{
+                              color: badge.color,
+                              background: badge.background,
+                              borderColor: badge.borderColor,
+                              maxWidth: '100%',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {creditor}
+                          </span>
+                        );
+                      })()}
+                    </td>
+                    <td className="px-3 py-3 text-left" style={{ color: '#111827', fontWeight: 400, maxWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {dtFormatDateParts(getRowValue(row, F.personalUpdatedDate)).date}
+                    </td>
+                    {!readOnly && (
+                      <td className="px-3 py-3 text-center">
+                        <button
+                          type="button"
+                          disabled={busyId === rowId}
+                          onClick={() => handleDelete(row)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-red-100 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100 hover:text-red-700 disabled:opacity-50"
+                        >
+                          <IcTrash />
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CollectionTableSection({
+  section,
+  rows,
+  loading,
+  onDelete,
+  onMove,
+  onSaveRow,
+  reasonOptions,
+  instructionOptions,
+  dropdownOpen,
+  setDropdownOpen,
+}) {
+  const open = dropdownOpen || { sectionKey: null, id: null, field: null, style: null };
+  const [sel, setSel] = useDtState(new Set());
+  const [busy, setBusy] = useDtState(false);
+  const [moveRowId, setMoveRowId] = useDtState(null);
+  const [moveMenuOpen, setMoveMenuOpen] = useDtState(false);
+  const [moveMenuStyle, setMoveMenuStyle] = useDtState(null);
+  const moveMenuRef = React.useRef(null);
+  const [bulkMoveOpen, setBulkMoveOpen] = useDtState(false);
+  const bulkMoveRef = React.useRef(null);
+  const bulkMoveButtonRef = React.useRef(null);
+  const [bulkMoveMenuStyle, setBulkMoveMenuStyle] = useDtState(null);
+  const moveOptions = COLLECTION_MOVE_OPTIONS.filter(opt => opt.key !== section.key);
+  const headers = [
+    'Reason', 'Instruction', 'Rental Reason', 'Rental Instruction','Collection Agency', 'Balance',
+    'Status', 'Creditor', 'Original Creditor',
+    'Opened Date', 'Action',
+  ];
+  const allChecked = rows.length > 0 && rows.every(r => sel.has(r.id || r.ID));
+
+  useDtEffect(() => {
+    setSel(new Set());
+    setMoveRowId(null);
+    setMoveMenuOpen(false);
+    setMoveMenuStyle(null);
+    setBulkMoveOpen(false);
+    setBulkMoveMenuStyle(null);
+  }, [rows]);
+
+  function toggleAll() {
+    const next = allChecked ? new Set() : new Set(rows.map(r => r.id || r.ID).filter(Boolean));
+    setSel(next);
+    setBulkMoveOpen(false);
+    setBulkMoveMenuStyle(null);
+  }
+
+  function toggleRow(id) {
+    if (!id) return;
+    setSel(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      setBulkMoveOpen(false);
+      setBulkMoveMenuStyle(null);
+      return next;
+    });
+  }
+
+  useDtEffect(() => {
+    if (!open.id || open.sectionKey !== section.key) return;
+    function handle(e) {
+      const target = e.target && e.target.closest ? e.target : e.target && e.target.parentElement;
+      if (!target || !target.closest('[data-dropdown]')) {
+        setDropdownOpen({ sectionKey: null, id: null, field: null, style: null });
+      }
+    }
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, [open.id, open.sectionKey, section.key]);
+
+  useDtEffect(() => {
+    if (!moveMenuOpen) return;
+    function onKeyDown(e) {
+      if (e.key === 'Escape') {
+        setMoveMenuOpen(false);
+        setMoveRowId(null);
+        setMoveMenuStyle(null);
+      }
+    }
+    function onClick(e) {
+      if (moveMenuRef.current && !moveMenuRef.current.contains(e.target)) {
+        setMoveMenuOpen(false);
+        setMoveRowId(null);
+        setMoveMenuStyle(null);
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    document.addEventListener('mousedown', onClick);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('mousedown', onClick);
+    };
+  }, [moveMenuOpen]);
+
+  useDtEffect(() => {
+    if (!bulkMoveOpen) return;
+    function onKeyDown(e) {
+      if (e.key === 'Escape') setBulkMoveOpen(false);
+    }
+    function onClick(e) {
+      if (bulkMoveRef.current && !bulkMoveRef.current.contains(e.target)) {
+        setBulkMoveOpen(false);
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    document.addEventListener('mousedown', onClick);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('mousedown', onClick);
+    };
+  }, [bulkMoveOpen]);
+
+  useDtEffect(() => {
+    if (sel.size === 0) return;
+    setMoveMenuOpen(false);
+    setMoveRowId(null);
+    setMoveMenuStyle(null);
+  }, [sel.size]);
+
+  function rowKey(row) {
+    return row.id || row.ID || [
+      section.key,
+      getRowValue(row, F.collectionName),
+      getRowValue(row, F.Creditor),
+      getRowValue(row, F.collectionOriginalCreditor),
+    ].map(dtStr).join('|');
+  }
+
+  function buildMenuStyle(triggerEl) {
+    if (!triggerEl || !triggerEl.getBoundingClientRect) return null;
+    const rect = triggerEl.getBoundingClientRect();
+    const menuWidth = 320;
+    const menuMaxHeight = 180;
+    const pad = 8;
+    let left = rect.left;
+    if (left + menuWidth > window.innerWidth - pad) {
+      left = Math.max(pad, window.innerWidth - menuWidth - pad);
+    }
+    let top = rect.bottom + 4;
+    if (top + menuMaxHeight > window.innerHeight - pad) {
+      top = Math.max(pad, rect.top - menuMaxHeight - 4);
+    }
+    return {
+      position: 'fixed',
+      top,
+      left,
+      width: menuWidth,
+      maxHeight: menuMaxHeight,
+      zIndex: 9999,
+    };
+  }
+
+  function buildMoveMenuStyle(triggerEl) {
+    if (!triggerEl || !triggerEl.getBoundingClientRect) return null;
+    const rect = triggerEl.getBoundingClientRect();
+    const menuWidth = 215;
+    const menuMaxHeight = 245;
+    const pad = 8;
+    let left = rect.left;
+    if (left < pad) left = pad;
+    if (left + menuWidth > window.innerWidth - pad) {
+      left = Math.max(pad, window.innerWidth - menuWidth - pad);
+    }
+
+    let top = rect.bottom + 4;
+    if (top + menuMaxHeight > window.innerHeight - pad) {
+      top = Math.max(pad, rect.top - menuMaxHeight - 4);
+    }
+
+    return {
+      position: 'fixed',
+      top,
+      left,
+      width: menuWidth,
+      maxHeight: menuMaxHeight,
+      zIndex: 2147483647,
+    };
+  }
+
+  function toggleDropdown(e, key, field) {
+    e.preventDefault();
+    e.stopPropagation();
+    setDropdownOpen(prev => (prev.sectionKey === section.key && prev.id === key && prev.field === field)
+      ? { sectionKey: null, id: null, field: null, style: null }
+      : { sectionKey: section.key, id: key, field, style: buildMenuStyle(e.currentTarget) }
+    );
+  }
+
+  async function selectOption(row, field, optionId) {
+    const id = row.id || row.ID;
+    const currentId = lookupId(getRowValue(row, field));
+    setDropdownOpen({ sectionKey: null, id: null, field: null, style: null });
+    if (!id || !optionId || String(optionId) === String(currentId)) return;
+    setBusy(true);
+    await onSaveRow(id, field, optionId);
+    setBusy(false);
+  }
+
+  function renderDropdown(row, field, options) {
+    const selectedId = lookupId(getRowValue(row, field));
+    const selectedLabel = optionLabel(options, selectedId) || dtStr(getRowValue(row, field)) || 'Select';
+    const key = rowKey(row);
+    const isOpen = open.sectionKey === section.key && open.id === key && open.field === field;
+
+    const menu = isOpen ? (
+      <div
+        className="fixed rounded-xl border bg-white shadow-2xl overflow-hidden"
+        data-dropdown
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          ...(open.style || { position: 'fixed', width: 320, maxHeight: 220 }),
+          zIndex: 2147483647,
+          borderColor: '#dbe3ee',
+          boxShadow: '0 20px 50px rgba(15, 23, 42, 0.16)',
+        }}
+      >
+        <div className="max-h-56 overflow-y-auto py-1">
+          {options.length === 0 ? (
+            <div className="px-3 py-2 text-xs text-gray-400">No options</div>
+          ) : (
+            options.map(opt => (
+              <button
+                type="button"
+                key={opt.id}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => selectOption(row, field, opt.id)}
+                className={`block w-full text-left px-3 py-2 text-xs transition-colors hover:bg-sky-50 ${
+                  String(opt.id) === String(selectedId)
+                    ? 'bg-sky-50 text-sky-700 font-semibold'
+                    : 'text-gray-700'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+    ) : null;
+
+    return (
+      <div className="relative inline-block" data-dropdown onMouseDown={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          disabled={busy}
+          title={selectedLabel || 'Select'}
+          onClick={(e) => toggleDropdown(e, key, field)}
+          className="w-36 text-left text-[11px] border rounded-lg px-2.5 py-1.5 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-sky-100 flex items-center justify-between disabled:opacity-60 shadow-sm transition-all"
+          style={{ borderColor: '#dbe3ee', color: '#0f172a' }}
+        >
+          <span className="truncate">{selectedLabel || 'Select'}</span>
+          <span className={`ml-2 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}>▾</span>
+        </button>
+        {menu && typeof ReactDOM !== 'undefined' && ReactDOM.createPortal
+          ? ReactDOM.createPortal(menu, document.body)
+          : menu}
+      </div>
+    );
+  }
+
+  function openMoveForRow(id, triggerEl) {
+    if (moveRowId === id && moveMenuOpen) {
+      setMoveMenuOpen(false);
+      setMoveRowId(null);
+      setMoveMenuStyle(null);
+      return;
+    }
+    setMoveRowId(id);
+    setMoveMenuStyle(buildMoveMenuStyle(triggerEl));
+    setMoveMenuOpen(true);
+  }
+
+  async function handleMoveRow(id, targetKey) {
+    setBusy(true);
+    await onMove(id, targetKey);
+    setMoveMenuOpen(false);
+    setMoveRowId(null);
+    setMoveMenuStyle(null);
+    setBusy(false);
+  }
+
+  async function handleBulkMove(targetKey) {
+    const ids = Array.from(sel);
+    if (!ids.length) return;
+    setBusy(true);
+    await Promise.all(ids.map(id => onMove(id, targetKey)));
+    setSel(new Set());
+    setBulkMoveOpen(false);
+    setBulkMoveMenuStyle(null);
+    setBusy(false);
+  }
+
+  async function handleDeleteRow(id) {
+    setBusy(true);
+    await onDelete(id);
+    setBusy(false);
+  }
+
+  async function handleBulkDelete() {
+    const ids = Array.from(sel);
+    if (!ids.length) return;
+    setBusy(true);
+    await Promise.all(ids.map(id => onDelete(id)));
+    setSel(new Set());
+    setBusy(false);
+  }
+
+  return (
+    <div
+      className="cf-glass cf-account-section rounded-xl border overflow-visible relative bg-white"
+      style={{
+        zIndex: sel.size > 0 || moveMenuOpen ? 2147483640 : 1,
+        borderColor: 'rgba(226, 232, 240, 0.9)',
+        boxShadow: '0 12px 34px rgba(15, 23, 42, 0.08)',
+      }}
+    >
+      <div
+        className="px-4 py-3 border-b flex items-center justify-between rounded-t-xl"
+        style={{ background: '#ffffff', borderColor: '#e5e7eb' }}
+      >
+        <span className="inline-flex items-center gap-2 text-sm font-bold text-slate-900 tracking-normal">
+          <span className="inline-block h-2 w-2 rounded-full bg-sky-500 shadow-sm" />
+          {section.label}
+        </span>
+        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-500">
+          {loading ? 'Loading...' : `${rows.length} record${rows.length !== 1 ? 's' : ''}`}
+        </span>
+      </div>
+
+      {sel.size > 0 && (
+        <div className="px-4 py-2 bg-blue-50 border-b border-blue-100 flex items-center gap-5 relative" style={{ zIndex: 2147483645, overflow: 'visible' }}>
+          {!bulkMoveOpen ? (
+            <button
+              ref={bulkMoveButtonRef}
+              disabled={busy}
+              onClick={() => setBulkMoveOpen(true)}
+              className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-800 disabled:opacity-40"
+            >
+              <IcArrow /> Move
+            </button>
+          ) : (
+            <div ref={bulkMoveRef} className="relative" style={{ zIndex: 2147483646 }}>
+              <button
+                ref={bulkMoveButtonRef}
+                type="button"
+                disabled={busy}
+                onClick={() => setBulkMoveOpen(prev => !prev)}
+                className="w-72 border border-slate-200 rounded-lg px-3 py-2 text-xs text-left bg-white hover:bg-slate-50 flex items-center justify-between shadow-sm"
+              >
+                <span className="text-slate-600">Choose Type</span>
+                <span className="ml-2 text-gray-400 rotate-180">▾</span>
+              </button>
+              <div
+                className="absolute left-0 top-full mt-1 w-72 rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xl"
+                style={{ zIndex: 2147483647 }}
+              >
+                <div className="max-h-48 overflow-y-auto p-1.5 space-y-1">
+                  {COLLECTION_MOVE_OPTIONS.map(opt => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => handleBulkMove(opt.key)}
+                      className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 transition-colors rounded-md"
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          <button
+            disabled={busy}
+            onClick={handleBulkDelete}
+            className="flex items-center gap-1.5 text-xs font-semibold text-red-500 hover:text-red-700 disabled:opacity-40"
+          >
+            <IcTrash /> Delete
+          </button>
+          <span className="ml-auto text-xs text-gray-500">{sel.size} selected</span>
+        </div>
+      )}
+
+      <div className="rounded-b-xl overflow-hidden bg-white">
+        <div
+          className="cf-glass-scroll overview-started-scroll"
+          style={{
+            overflowX: 'auto',
+            overflowY: 'auto',
+            background: '#ffffff',
+            maxHeight: 'calc(44px + (52px * 5))',
+            borderBottomLeftRadius: '0.75rem',
+            borderBottomRightRadius: '0.75rem',
+            scrollbarGutter: 'stable',
+          }}
+        >
+          <table
+            className="w-full"
+            style={{
+              fontSize: 13,
+              borderCollapse: 'separate',
+              borderSpacing: 0,
+              background: 'rgba(255, 255, 255, 0.72)',
+              minWidth: 1700,
+              color: '#0f172a',
+            }}
+          >
+            <thead>
+              <tr>
+                <th className="px-4 py-3 w-8 text-left">
+                  <input
+                    type="checkbox"
+                    checked={allChecked}
+                    onChange={toggleAll}
+                    className="w-3.5 h-3.5 rounded border-gray-300 cursor-pointer"
+                  />
+                </th>
+                {headers.map(header => (
+                  <th key={header} className="px-4 py-3 text-left whitespace-nowrap">
+                    {header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {!loading && rows.length === 0 && (
+                <tr>
+                  <td colSpan={headers.length + 1} className="px-4 py-5 text-center text-xs text-gray-400 italic">
+                    No records
+                  </td>
+                </tr>
+              )}
+              {rows.map((row, index) => {
+                const id = row.id || row.ID;
+                const key = id || `${section.key}-${index}`;
+                const isRowMoveOpen = moveRowId === id && moveMenuOpen;
+                return (
+                  <tr
+                    key={key}
+                    style={{
+                      background: id && sel.has(id)
+                        ? 'rgba(224,242,254,0.78)'
+                        : 'transparent',
+                    }}
+                  >
+                    <td className="px-4 py-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={!!id && sel.has(id)}
+                        onChange={() => toggleRow(id)}
+                        className="w-3.5 h-3.5 rounded border-gray-300 cursor-pointer"
+                      />
+                    </td>
+                    <td className="px-4 py-3 text-left">{renderDropdown(row, F.reason, reasonOptions)}</td>
+                    <td className="px-4 py-3 text-left">{renderDropdown(row, F.instruction, instructionOptions)}</td>
+                     <td className="px-4 py-3 text-left" style={{ minWidth: 180 }}>
+                      {dtStr(getRowValue(row, F.collectionRentalReason)) || '-'}
+                    </td>
+                    <td className="px-4 py-3 text-left" style={{ minWidth: 220 }}>
+                      {dtStr(getRowValue(row, F.collectionRentalInstruction)) || '-'}
+                    </td>
+                    <td className="px-4 py-3 text-left whitespace-nowrap">
+                      {dtStr(getRowValue(row, F.collectionAgencyStatus)) || '-'}
+                    </td>
+                    <td className="px-4 py-3 text-left whitespace-nowrap" style={{ fontWeight: 600 }}>
+                      {dtFmtBalance(getRowValue(row, F.collectionAgencyBalance))}
+                    </td>
+                    <td className="px-4 py-3 text-left whitespace-nowrap" style={{ color: '#111827', fontWeight: 500 }}>
+                      {dtStr(getRowValue(row, F.collectionName)) || '-'}
+                    </td>
+                    <td className="px-4 py-3 text-left whitespace-nowrap">
+                      {(() => {
+                        const creditor = getRowValue(row, F.Creditor) || '-';
+                        const badge = creditorBadgeStyle(creditor);
+                        return (
+                          <span
+                            className="inline-flex items-center justify-center rounded-full border px-2.5 py-1 text-xs font-semibold shadow-sm"
+                            style={{
+                              color: badge.color,
+                              background: badge.background,
+                              borderColor: badge.borderColor,
+                              minWidth: 86,
+                            }}
+                          >
+                            {creditor}
+                          </span>
+                        );
+                      })()}
+                    </td>
+                    <td className="px-4 py-3 text-left whitespace-nowrap">
+                      {dtStr(getRowValue(row, F.collectionOriginalCreditor)) || '-'}
+                    </td>
+                    <td className="px-4 py-3 text-left whitespace-nowrap">
+                      {dtFormatDateParts(getRowValue(row, F.collectionOpenedDate)).date}
+                    </td>
+                    <td className="px-4 py-3 text-center relative">
+                      {sel.size === 0 && (
+                        isRowMoveOpen ? (
+                          <div ref={moveMenuRef} className="relative inline-block w-44 text-left" style={{ zIndex: 20000 }}>
+                            <div className="rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMoveMenuOpen(false);
+                                  setMoveRowId(null);
+                                  setMoveMenuStyle(null);
+                                }}
+                                className="w-full border-b border-slate-200 px-3 py-2 text-xs text-left bg-white hover:bg-slate-50 flex items-center justify-between"
+                              >
+                                <span className="text-slate-600">Choose Type</span>
+                                <span className="ml-2 text-gray-400 rotate-180">▾</span>
+                              </button>
+                              <div className="max-h-48 overflow-y-auto p-1.5 space-y-1">
+                                {moveOptions.length === 0 ? (
+                                  <div className="px-3 py-2 text-xs text-gray-400">No options</div>
+                                ) : (
+                                  moveOptions.map(opt => (
+                                    <button
+                                      key={opt.key}
+                                      type="button"
+                                      onClick={() => handleMoveRow(id, opt.key)}
+                                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 rounded-md"
+                                    >
+                                      {opt.label}
+                                    </button>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center gap-2" style={{ zIndex: 20000 }}>
+                            <button
+                              type="button"
+                              disabled={busy || !id}
+                              onClick={(e) => openMoveForRow(id, e.currentTarget)}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 shadow-sm"
+                            >
+                              <IcMove />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy || !id}
+                              onClick={() => handleDeleteRow(id)}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-red-100 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100 hover:text-red-700 disabled:opacity-50"
+                            >
+                              <IcTrash />
+                            </button>
+                          </div>
+                        )
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AccountsDetailTable({ contactId, accounts: propAccounts, entityName }) {
   const [accounts, setAccounts] = useDtState(propAccounts || []);
   const [deletedAccounts, setDeletedAccounts] = useDtState([]);
+  const [inquiryTables, setInquiryTables] = useDtState({ new: [], inquiry: [], started: [] });
+  const [inquiriesLoading, setInquiriesLoading] = useDtState(false);
+  const [personalDataRows, setPersonalDataRows] = useDtState([]);
+  const [personalDataLoading, setPersonalDataLoading] = useDtState(false);
+  const [collectionRows, setCollectionRows] = useDtState([]);
+  const [collectionLoading, setCollectionLoading] = useDtState(false);
   const [reasonOptions, setReasonOptions] = useDtState([]);
   const [instructionOptions, setInstructionOptions] = useDtState([]);
+  const [collectionReasonOptions, setCollectionReasonOptions] = useDtState([]);
+  const [collectionInstructionOptions, setCollectionInstructionOptions] = useDtState([]);
   const [dropdownOpen, setDropdownOpen] = useDtState({ sectionKey: null, id: null, field: null, style: null });
+  const [collectionDropdownOpen, setCollectionDropdownOpen] = useDtState({ sectionKey: null, id: null, field: null, style: null });
 
   useDtEffect(() => {
     const active = (propAccounts || []).filter(r => !isDisplayDeleted(r));
@@ -1402,15 +2600,90 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName }) 
 
   useDtEffect(() => {
     let alive = true;
+    const clientId = normalizeInquiryClientId(contactId);
+
+    if (!clientId) {
+      setInquiryTables({ new: [], inquiry: [], started: [] });
+      setInquiriesLoading(false);
+      setPersonalDataRows([]);
+      setPersonalDataLoading(false);
+      setCollectionRows([]);
+      setCollectionLoading(false);
+      return () => { alive = false; };
+    }
+
+    setInquiriesLoading(true);
+    setPersonalDataLoading(true);
+    setCollectionLoading(true);
+
+    fetchInquiryTables(clientId)
+      .then((tables) => {
+        if (!alive) return;
+        setInquiryTables(tables);
+      })
+      .catch((error) => {
+        if (!alive) return;
+        console.warn('[CF] Inquiry tables load failed:', error);
+        setInquiryTables({ new: [], inquiry: [], started: [] });
+      })
+      .finally(() => {
+        if (alive) setInquiriesLoading(false);
+      });
+
+    fetchPersonalDataRows(clientId)
+      .then((rows) => {
+        if (!alive) return;
+        setPersonalDataRows(rows);
+      })
+      .catch((error) => {
+        if (!alive) return;
+        console.warn('[CF] Personal_Data load failed:', error);
+        setPersonalDataRows([]);
+      })
+      .finally(() => {
+        if (alive) setPersonalDataLoading(false);
+      });
+
+    fetchCollectionRows(clientId)
+      .then((rows) => {
+        if (!alive) return;
+        setCollectionRows(rows);
+      })
+      .catch((error) => {
+        if (!alive) return;
+        console.warn('[CF] Collection load failed:', error);
+        setCollectionRows([]);
+      })
+      .finally(() => {
+        if (alive) setCollectionLoading(false);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [contactId]);
+
+  useDtEffect(() => {
+    let alive = true;
     async function loadOptions() {
-      const { reasons, instructions } = await fetchMasterOptions();
+      const [
+        { reasons, instructions },
+        { reasons: collectionReasons, instructions: collectionInstructions },
+      ] = await Promise.all([
+        fetchMasterOptions('Account'),
+        fetchMasterOptions('Collection'),
+      ]);
       if (!alive) return;
       setReasonOptions(reasons);
       setInstructionOptions(instructions);
+      setCollectionReasonOptions(collectionReasons);
+      setCollectionInstructionOptions(collectionInstructions);
       console.log('[CF] Reason options:', reasons);
       console.log('[CF] Reason option labels:', reasons.map(r => r.label));
       console.log('[CF] Instruction options:', instructions);
       console.log('[CF] Instruction option labels:', instructions.map(r => r.label));
+      console.log('[CF] Collection reason options:', collectionReasons);
+      console.log('[CF] Collection instruction options:', collectionInstructions);
     }
     loadOptions();
     return () => { alive = false; };
@@ -1497,15 +2770,82 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName }) 
         })
       ));
       setAccounts(prev => prev.filter(r => !ids.includes(r.id)));
-      if (moved.length) {
-        setDeletedAccounts(prev => {
-          const idSet = new Set(ids);
-          const kept = prev.filter(r => !idSet.has(r.id));
-          const displayDeleted = moved.filter(isDisplayDeleted);
-          return [...displayDeleted, ...kept];
-        });
-      }
+      setDeletedAccounts(prev => prev.filter(r => !ids.includes(r.id)));
     } catch (e) { console.warn('delete error', e); }
+  }
+
+  async function handlePersonalDataDelete(id) {
+    if (!id) return;
+    try {
+      await ZOHO.CRM.API.updateRecord({
+        Entity: 'Personal_Data',
+        RecordID: id,
+        APIData: { id, Delete_flag: 'true' },
+      });
+      setPersonalDataRows(prev => prev.filter(row => String(row.id || row.ID) !== String(id)));
+    } catch (e) {
+      console.warn('personal data delete error', e);
+    }
+  }
+
+  async function refreshCollections() {
+    const clientId = normalizeInquiryClientId(contactId);
+    if (!clientId) {
+      setCollectionRows([]);
+      return;
+    }
+    setCollectionLoading(true);
+    try {
+      const rows = await fetchCollectionRows(clientId);
+      setCollectionRows(rows);
+    } catch (e) {
+      console.warn('collection refresh error', e);
+      setCollectionRows([]);
+    } finally {
+      setCollectionLoading(false);
+    }
+  }
+
+  async function handleCollectionDelete(id) {
+    if (!id) return;
+    try {
+      await ZOHO.CRM.API.updateRecord({
+        Entity: 'Collection',
+        RecordID: id,
+        APIData: { id, Delete_flag: 'true' },
+      });
+      await refreshCollections();
+    } catch (e) {
+      console.warn('collection delete error', e);
+    }
+  }
+
+  async function handleCollectionMove(id, targetType) {
+    if (!id || !targetType) return;
+    try {
+      await ZOHO.CRM.API.updateRecord({
+        Entity: 'Collection',
+        RecordID: id,
+        APIData: { id, [F.collectionBlockType]: targetType, [F.tagValue]: '' },
+      });
+      await refreshCollections();
+    } catch (e) {
+      console.warn('collection move error', e);
+    }
+  }
+
+  async function handleCollectionSaveRow(id, field, optionId) {
+    try {
+      const apiData = { id, [field]: { id: optionId } };
+      await ZOHO.CRM.API.updateRecord({
+        Entity: 'Collection',
+        RecordID: id,
+        APIData: apiData,
+      });
+      await refreshCollections();
+    } catch (e) {
+      console.warn('collection save error', e);
+    }
   }
 
   async function handleMove(ids, targetType) {
@@ -1554,6 +2894,15 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName }) 
     if (grouped[key]) grouped[key].push(acc);
   });
 
+  const activePersonalDataGroups = groupPersonalRowsByName(
+    personalDataRows.filter(row => !isPicklistYes(getRowValue(row, F.personalIsDeleted)))
+  );
+  const deletedPersonalDataGroups = groupPersonalRowsByName(
+    personalDataRows.filter(row => isPicklistYes(getRowValue(row, F.personalIsDeleted)))
+  );
+  const groupedCollections = groupCollectionRows(collectionRows);
+  const visibleCollectionSections = COLLECTION_SECTIONS.filter(section => (groupedCollections[section.key] || []).length > 0);
+
   return (
     <div className="space-y-4">
       {DT_SECTIONS.map(section => (
@@ -1582,6 +2931,57 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName }) 
         setDropdownOpen={setDropdownOpen}
         readOnly={true}
       />
+      <InquiryTableSection
+        title="New Inquiries"
+        rows={inquiryTables.new}
+        loading={inquiriesLoading}
+      />
+      <InquiryTableSection
+        title="Inquiries"
+        rows={inquiryTables.inquiry}
+        loading={inquiriesLoading}
+      />
+      <InquiryTableSection
+        title="Started Inquiries"
+        rows={inquiryTables.started}
+        loading={inquiriesLoading}
+      />
+      {activePersonalDataGroups.map(group => (
+        <PersonalDataTableSection
+          key={`personal-${group.name}`}
+          title={`Personal Data(${group.name})`}
+          fieldName={group.name}
+          rows={group.rows}
+          loading={personalDataLoading}
+          onDelete={handlePersonalDataDelete}
+        />
+      ))}
+      {deletedPersonalDataGroups.map(group => (
+        <PersonalDataTableSection
+          key={`deleted-personal-${group.name}`}
+          title={`Deleted Personal Data(${group.name})`}
+          fieldName={group.name}
+          rows={group.rows}
+          loading={personalDataLoading}
+          onDelete={handlePersonalDataDelete}
+          readOnly={true}
+        />
+      ))}
+      {visibleCollectionSections.map(section => (
+        <CollectionTableSection
+          key={section.key}
+          section={section}
+          rows={groupedCollections[section.key]}
+          loading={collectionLoading}
+          onDelete={handleCollectionDelete}
+          onMove={handleCollectionMove}
+          onSaveRow={handleCollectionSaveRow}
+          reasonOptions={collectionReasonOptions}
+          instructionOptions={collectionInstructionOptions}
+          dropdownOpen={collectionDropdownOpen}
+          setDropdownOpen={setCollectionDropdownOpen}
+        />
+      ))}
     </div>
   );
 }

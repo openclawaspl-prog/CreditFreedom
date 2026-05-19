@@ -420,19 +420,19 @@ const DisputeWidget = () => {
 
   return (
     <div className="space-y-4">
-      <ActionButtonsBar contactId={contactId} entity={entityName} />
-
       <ClientHeaderCard
         name={c.Full_Name}
         email={c.Email}
         referredBy={c.Referred_By}
         status={c.Client_Status}
-      />
+      >
+        <ActionButtonsBar contactId={contactId} entity={entityName} />
+      </ClientHeaderCard>
 
       <div className="grid grid-cols-1 gap-4 items-start" style={{ gridTemplateColumns: '1fr' }}>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-start">
           <div className="lg:col-span-3">
-            <CreditScoresCard record={c} />
+            <CreditScoresCard record={c} contactId={contactId} />
           </div>
           <div className="lg:col-span-2">
             <DisputeStatusTable counts={counts} />

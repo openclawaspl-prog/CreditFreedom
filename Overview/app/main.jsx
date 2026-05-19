@@ -238,22 +238,6 @@ const MainWidget = () => {
         <CreditBureauReportsCard />
         <StartedAccountsCard />
         <AlertcontrolPanelCard />
-
-        <div className="grid grid-cols-1 md:grid-cols-[0.9fr_1.1fr] gap-4 items-start">
-          <div className="space-y-3">
-            <LogginCredentialsCard stretch />
-          </div>
-
-          <div className="space-y-4">
-            <div className="h-[360px] md:w-[calc(100%+420px)]">
-              <BureauScoreLineChart />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:w-[calc(100%+420px)]">
-              <BillingNotesCard />
-              <ReferralCreditsCard />
-            </div>
-          </div>
-        </div>
       </div>
 
       <div className="space-y-4">
@@ -264,6 +248,20 @@ const MainWidget = () => {
         <ActivitiesCard />
         <AccountsCountChart />
         <TotalBalanceCard />
+      </div>
+
+      <div className="space-y-4">
+        <LogginCredentialsCard stretch />
+      </div>
+
+      <div className="space-y-4 lg:col-span-2">
+        <div className="min-h-[300px] max-h-[440px] aspect-[16/7]">
+          <BureauScoreLineChart />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <BillingNotesCard />
+          <ReferralCreditsCard />
+        </div>
       </div>
     </div>
   );

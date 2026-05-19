@@ -83,7 +83,6 @@ function CreditFactorStatCard({ title, value, note, badgeValue }) {
         <span className="inline-flex items-center justify-center min-w-[40px] h-7 px-2 rounded-md bg-indigo-50 text-indigo-600 text-xs font-bold whitespace-nowrap">
           {badge}
         </span>
-        <span className="text-sm font-semibold text-gray-900">{value}</span>
       </div>
       <p className="text-xs text-gray-500 mt-2">{note}</p>
     </div>

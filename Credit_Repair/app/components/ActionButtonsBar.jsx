@@ -24,7 +24,8 @@ const IcDots = () => (
 const OutlineBtn = ({ onClick, children, className = '' }) => (
   <button
     onClick={onClick}
-    className={`flex items-center gap-1.5 px-3.5 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors shadow-sm whitespace-nowrap ${className}`}
+    className={`flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-slate-800 bg-white border border-white/80 rounded-lg hover:bg-sky-50 active:bg-sky-100 transition-colors shadow-lg whitespace-nowrap ${className}`}
+    style={{ boxShadow: '0 10px 24px rgba(15, 23, 42, 0.18)' }}
   >
     {children}
   </button>
@@ -84,7 +85,7 @@ function ActionButtonsBar({ contactId, entity }) {
   }
 
   return (
-    <div className="flex items-center justify-end gap-2 mb-1">
+    <div className="flex flex-wrap items-center justify-end gap-2">
 
       <OutlineBtn onClick={handleSendTextMessage}>
         Send Text Message
@@ -121,7 +122,8 @@ function ActionButtonsBar({ contactId, entity }) {
         trigger={(toggle) => (
           <button
             onClick={toggle}
-            className="p-2 text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 shadow-sm transition-colors"
+            className="p-2.5 text-slate-700 bg-white border border-white/80 rounded-lg hover:bg-sky-50 shadow-lg transition-colors"
+            style={{ boxShadow: '0 10px 24px rgba(15, 23, 42, 0.18)' }}
             title="More options"
           >
             <IcDots />

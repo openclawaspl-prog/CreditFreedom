@@ -6,6 +6,66 @@ function toScore(value) {
   return Math.max(0, number);
 }
 
+function normalizeCreditBureau(value) {
+  const text = String(value || '').trim().toLowerCase().replace(/[\s_-]+/g, '');
+  if (text === 'equifax') return 'Equifax';
+  if (text === 'experian') return 'Experian';
+  if (text === 'transunion') return 'TransUnion';
+  return '';
+}
+
+function getCreditBureauRecordTime(record) {
+  const raw = record.Created_Time || record.CreatedTime || record.Modified_Time || '';
+  const time = raw ? new Date(raw).getTime() : 0;
+  return Number.isFinite(time) ? time : 0;
+}
+
+function normalizeCreditBureauClientId(value) {
+  if (!value) return '';
+  if (Array.isArray(value)) return normalizeCreditBureauClientId(value[0]);
+  if (typeof value === 'object') {
+    return String(value.id || value.ID || value.record_id || value.RecordID || '').trim();
+  }
+  return String(value).trim();
+}
+
+async function fetchLatestBureauScores(clientId) {
+  if (!clientId || !window.ZOHO || !ZOHO.CRM || !ZOHO.CRM.API || !ZOHO.CRM.API.searchRecord) {
+    return {};
+  }
+
+  const all = [];
+  const perPage = 200;
+  const query = `(Client:equals:${clientId})`;
+
+  for (let page = 1; page <= 10; page++) {
+    const resp = await ZOHO.CRM.API.searchRecord({
+      Entity: 'Bureau_Score',
+      Type: 'criteria',
+      Query: query,
+    }, page, perPage);
+
+    const data = (resp && resp.data) || [];
+    all.push(...data);
+
+    const more = resp && resp.info && resp.info.more_records;
+    if (!more || data.length < perPage) break;
+  }
+
+  const latestScores = {};
+
+  all
+    .slice()
+    .sort((a, b) => getCreditBureauRecordTime(b) - getCreditBureauRecordTime(a))
+    .forEach((record) => {
+      const bureau = normalizeCreditBureau(record.Creditor);
+      if (!bureau || Object.prototype.hasOwnProperty.call(latestScores, bureau)) return;
+      latestScores[bureau] = toScore(record.Creditor_Score);
+    });
+
+  return latestScores;
+}
+
 function SpeedometerGauge({ value, max, gradientId }) {
   const safeValue = Math.max(0, Math.min(value, max));
   const cx = 60;
@@ -116,29 +176,23 @@ function BureauCol({ name, score, max, gaugeId }) {
 
 function CreditBureauReportsCard() {
   const MAX_SCORE = 900;
-  const [record, setRecord] = useCreditBureauState(null);
+  const [scores, setScores] = useCreditBureauState({});
   const [loading, setLoading] = useCreditBureauState(true);
   const [error, setError] = useCreditBureauState('');
 
   useCreditBureauEffect(() => {
     return window.OverviewWidget.onPageLoad((data) => {
-      const recordId = data.EntityId;
+      const clientId = normalizeCreditBureauClientId(data && data.EntityId);
       setLoading(true);
       setError('');
 
-      ZOHO.CRM.API.getRecord({ Entity: 'Contacts', RecordID: recordId })
-        .then((res) => {
-          const fresh = res.data?.[0];
-          if (!fresh) {
-            setError('Record not found.');
-            setRecord(null);
-            return;
-          }
-          setRecord(fresh);
+      fetchLatestBureauScores(clientId)
+        .then((latestScores) => {
+          setScores(latestScores);
         })
         .catch(() => {
           setError('Failed to load credit scores.');
-          setRecord(null);
+          setScores({});
         })
         .finally(() => {
           setLoading(false);
@@ -148,9 +202,9 @@ function CreditBureauReportsCard() {
   }, []);
 
   const bureaus = [
-    { name: 'Equifax', score: toScore(record?.Equifax_Score) },
-    { name: 'Experian', score: toScore(record?.Experin_Score) },
-    { name: 'TransUnion', score: toScore(record?.Transunion_Score) },
+    { name: 'Equifax', score: toScore(scores.Equifax) },
+    { name: 'Experian', score: toScore(scores.Experian) },
+    { name: 'TransUnion', score: toScore(scores.TransUnion) },
   ];
 
   return (

@@ -240,7 +240,7 @@ const MainWidget = () => {
         <CommentsCard />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:col-span-3 xl:grid-cols-[minmax(520px,1fr)_280px_250px_250px]">
+      <div className="grid grid-cols-1 gap-4 lg:col-span-3 2xl:grid-cols-[minmax(520px,1fr)_280px_250px_250px]">
         <CreditBureauReportsCard />
         <MessageTemplatesCard />
         <CreditBureauAutomationCard />

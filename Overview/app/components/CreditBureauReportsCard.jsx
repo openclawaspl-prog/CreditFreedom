@@ -71,6 +71,7 @@ function SpeedometerGauge({ value, min = 300, max, gradientId }) {
   const displayValue = Math.round(safeValue);
   const ratio = safeValue > 0 ? (Math.max(min, safeValue) - min) / (max - min) : 0;
   const cx = 120;
+  
   const cy = 145;
   const arcRadius = 97;
   const innerRadius = 57;

@@ -119,7 +119,7 @@ function Bone({ w = 'w-full', h = 'h-4' }) {
 
 function CardSkeleton() {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4 h-[480px]">
       <Bone w="w-28" h="h-5" />
       <div className="mt-2 divide-y divide-gray-100">
         {[0, 1, 2, 3, 4, 5].map(i => (
@@ -181,7 +181,7 @@ function ClientDetailsCard() {
 
   /* ── Fetch with cache ── */
   useEffect(() => {
-    ZOHO.embeddedApp.on('PageLoad', (data) => {
+    return window.OverviewWidget.onPageLoad((data) => {
       const recordId = data.EntityId;
 
       /* ① Instant render from cache */
@@ -215,10 +215,9 @@ function ClientDetailsCard() {
         .finally(() => {
           setLoading(false);
           setRefreshing(false);
+          window.OverviewWidget.requestResize();
         });
     });
-
-    ZOHO.embeddedApp.init();
   }, []);
 
   /* ── Keyboard shortcuts ── */
@@ -290,13 +289,13 @@ function ClientDetailsCard() {
   if (loading) return <CardSkeleton />;
 
   if (error) return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-10 text-center">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-10 text-center h-[480px] flex items-center justify-center">
       <p className="text-sm text-red-500">{error}</p>
     </div>
   );
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4 flex flex-col h-full">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4 flex flex-col h-[480px]">
 
       {/* Header */}
       <div className="flex items-center justify-between mb-1">

@@ -46,13 +46,11 @@ function CommentsCard() {
   const commentsScrollRef = useRef(null);
 
   useEffect(() => {
-    ZOHO.embeddedApp.on("PageLoad", function(data) {
+    return window.OverviewWidget.onPageLoad(function(data) {
       const contactRecordId = data.EntityId;
       setRecordId(contactRecordId);
       fetchComments(contactRecordId);
     });
-
-    ZOHO.embeddedApp.init();
   }, []);
 
   const fetchComments = (contactRecordId) => {
@@ -78,11 +76,13 @@ function CommentsCard() {
         setComments([]);
       }
       setLoading(false);
+      window.OverviewWidget.requestResize();
     })
     .catch(function(err) {
       console.error("Failed to load comments:", err);
       setError("Failed to load comments");
       setLoading(false);
+      window.OverviewWidget.requestResize();
     });
   };
 
@@ -98,8 +98,19 @@ function CommentsCard() {
   };
 
   const scrollToLatest = () => {
-    if (!commentsScrollRef.current) return;
-    commentsScrollRef.current.scrollTop = commentsScrollRef.current.scrollHeight;
+    const el = commentsScrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    requestAnimationFrame(() => {
+      if (commentsScrollRef.current) {
+        commentsScrollRef.current.scrollTop = commentsScrollRef.current.scrollHeight;
+      }
+    });
+    setTimeout(() => {
+      if (commentsScrollRef.current) {
+        commentsScrollRef.current.scrollTop = commentsScrollRef.current.scrollHeight;
+      }
+    }, 100);
   };
 
   const formatTimestamp = (isoDate) => {
@@ -154,6 +165,7 @@ function CommentsCard() {
         setNewComment('');
         setPosting(false);
         setError(null);
+        window.OverviewWidget.requestResize();
         fetchComments(recordId);
       })
       .catch(function(err) {

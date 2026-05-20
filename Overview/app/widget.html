@@ -3,9 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CreditFreedom – Client Details</title>
+  <title>CreditFreedom Dashboard</title>
 
   <script src="https://cdn.tailwindcss.com"></script>
+
+  <!--SETS THE WIDGET HEIGHT TO THE HEIGHT OF THE CONTENT, WITH A MAX HEIGHT OF 100vh-->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -13,24 +16,115 @@
 
   <style>
     * { box-sizing: border-box; }
-    body { background: #f1f3f5; font-family: Inter, system-ui, sans-serif; margin: 0; }
+    html { margin: 0; padding: 0;min-height: auto; overflow: hidden; }
+    body {
+      margin: 0;
+      padding: 12px;
+      overflow: hidden;
+      background: #edf1f6;
+      font-family: Inter, system-ui, sans-serif;
+      color: #111827;
+    }
+    #root { position: relative; z-index: 1; }
+
+    #overview-content .bg-white.rounded-xl.border {
+      position: relative;
+      isolation: isolate;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.56) !important;
+      border-color: rgba(255, 255, 255, 0.72) !important;
+      box-shadow:
+        0 20px 55px rgba(15, 23, 42, 0.12),
+        0 1px 0 rgba(255, 255, 255, 0.65),
+        inset 0 1px 0 rgba(255, 255, 255, 0.95),
+        inset 0 -1px 0 rgba(148, 163, 184, 0.12) !important;
+      backdrop-filter: blur(26px) saturate(180%);
+      -webkit-backdrop-filter: blur(26px) saturate(180%);
+      background-clip: padding-box;
+    }
+
+    #overview-content .bg-white.rounded-xl.border::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      border-radius: inherit;
+      background: rgba(255, 255, 255, 0.24);
+      opacity: 0.9;
+      z-index: 0;
+    }
+
+    #overview-content .bg-white.rounded-xl.border::after {
+      content: "";
+      position: absolute;
+      inset: 1px;
+      pointer-events: none;
+      border-radius: inherit;
+      border: 1px solid rgba(255, 255, 255, 0.34);
+      z-index: 0;
+    }
+
+    #overview-content .bg-white.rounded-xl.border > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    #overview-content input.bg-white,
+    #overview-content select.bg-white,
+    #overview-content textarea,
+    #overview-content .overview-started-scroll.bg-white,
+    #overview-content thead.bg-white {
+      background: rgba(255, 255, 255, 0.62) !important;
+      border-color: rgba(255, 255, 255, 0.64) !important;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.76);
+      backdrop-filter: blur(18px) saturate(160%);
+      -webkit-backdrop-filter: blur(18px) saturate(160%);
+    }
+
+    #overview-content .bg-gray-50,
+    #overview-content .bg-gray-100 {
+      background-color: rgba(255, 255, 255, 0.38) !important;
+      border-color: rgba(255, 255, 255, 0.46) !important;
+    }
+
+    @media (min-width: 768px)  { body { padding: 16px; } }
+    @media (min-width: 1024px) { body { padding: 20px; } }
     input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.5; cursor: pointer; }
   </style>
 </head>
-<body class="p-4 min-h-screen">
+<body>
 
-  <div id="root" class="max-w-6xl mx-auto"></div>
+  <div id="root"></div>
 
-  <!-- Client Details Card Script -->
+  <!-- Column 1 -->
   <script type="text/babel" src="./components/ClientDetailsCard.jsx"></script>
 
-  <!-- Payment Details & Actions Card Script -->
+  <!-- Column 2 -->
   <script type="text/babel" src="./components/PaymentdetailsCard.jsx"></script>
 
-  <!-- Comments Card Script -->
+  <!-- Column 3 (right sidebar) -->
   <script type="text/babel" src="./components/CommentsCard.jsx"></script>
+  <script type="text/babel" src="./components/CreditBureauAutomationCard.jsx"></script>
+  <script type="text/babel" src="./components/ProgramEligibilityCard.jsx"></script>
+  <script type="text/babel" src="./components/MessageTemplatesCard.jsx"></script>
+  <script type="text/babel" src="./components/ActivitiesCard.jsx"></script>
+  <script type="text/babel" src="./components/AccountsCountChart.jsx"></script>
 
-  <!-- App Entry -->
+  <!-- Row 2 left panel -->
+  <script type="text/babel" src="./components/CreditBureauReportsCard.jsx"></script>
+  <script type="text/babel" src="./components/LogginCredentialsCard.jsx"></script>
+  <script type="text/babel" src="./components/AlertcontrolPanelCard.jsx"></script>
+  <script type="text/babel" src="./components/BillingNotesCard.jsx"></script>
+
+  <!-- Row 3 -->
+  <script type="text/babel" src="./components/StartedAccountsCard.jsx"></script>
+
+  <!-- Row 4 -->
+  <script type="text/babel" src="./components/TotalBalanceCard.jsx"></script>
+  <script type="text/babel" src="./components/ReferralCreditsCard.jsx"></script>
+  <script type="text/babel" src="./components/BureauScoreLineChart.jsx"></script>
+
+  <!-- App entry — must be last -->
   <script type="text/babel" src="./main.jsx"></script>
 
 </body>

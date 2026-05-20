@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 164 40" role="img" aria-labelledby="title">
+  <title>Equifax</title>
+  <rect width="164" height="40" fill="none"/>
+  <text x="0" y="28" fill="#c41230" font-family="Arial Black, Arial, sans-serif" font-size="29" font-style="italic" font-weight="900">EQUIFAX</text>
+  <circle cx="159" cy="11" r="3" fill="none" stroke="#c41230" stroke-width="1.5"/>
+  <text x="156.6" y="13.5" fill="#c41230" font-family="Arial, sans-serif" font-size="5" font-weight="700">R</text>
+</svg>

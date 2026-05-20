@@ -174,7 +174,7 @@ function AlertcontrolPanelCard() {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm w-full lg:w-4/5 px-5 pt-5 pb-4">
       <h2 className="text-base font-bold text-gray-900 mb-4">Alert Control Panel</h2>
 
       {error && (
@@ -183,9 +183,9 @@ function AlertcontrolPanelCard() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 items-start">
         {alertColumns.map((column, columnIndex) => (
-          <div key={columnIndex} className="space-y-3">
+          <div key={columnIndex} className="space-y-2.5">
             {column.map((field) => {
               const isBillingIssue = field.api === BILLING_ISSUE_API;
               const billingIssueOn = !!values[BILLING_ISSUE_API];
@@ -193,9 +193,9 @@ function AlertcontrolPanelCard() {
               const restartedOn = !!values[RESTARTED_API];
 
               return (
-                <div key={field.api} className="bg-gray-100 rounded-xl px-4 py-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-sm font-medium text-gray-700">{field.label}</span>
+                <div key={field.api} className="min-h-[64px] rounded-lg bg-[#f1f3f5] px-3.5 py-3">
+                  <div className="grid min-h-10 max-w-[270px] grid-cols-[minmax(0,1fr)_44px] items-center gap-2">
+                    <span className="text-sm font-semibold text-gray-700">{field.label}</span>
                     <ToggleSwitch
                       checked={!!values[field.api]}
                       disabled={loading || !!saving[field.api]}

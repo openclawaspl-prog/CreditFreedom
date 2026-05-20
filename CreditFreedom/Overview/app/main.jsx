@@ -234,17 +234,25 @@ const MainWidget = () => {
             <PaymentActionsCard />
           </div>
         </div>
+      </div>
 
+      <div className="space-y-4">
+        <CommentsCard />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:col-span-3 xl:grid-cols-[minmax(520px,1fr)_280px_250px_300px]">
         <CreditBureauReportsCard />
+        <MessageTemplatesCard />
+        <CreditBureauAutomationCard />
+        <ProgramEligibilityCard />
+      </div>
+
+      <div className="lg:col-span-2 space-y-4">
         <StartedAccountsCard />
         <AlertcontrolPanelCard />
       </div>
 
       <div className="space-y-4">
-        <CommentsCard />
-        <MessageTemplatesCard />
-        <CreditBureauAutomationCard />
-        <ProgramEligibilityCard />
         <ActivitiesCard />
         <AccountsCountChart />
         <TotalBalanceCard />

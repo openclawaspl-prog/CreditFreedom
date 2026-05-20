@@ -66,108 +66,143 @@ async function fetchLatestBureauScores(clientId) {
   return latestScores;
 }
 
-function SpeedometerGauge({ value, max, gradientId }) {
+function SpeedometerGauge({ value, min = 300, max, gradientId }) {
   const safeValue = Math.max(0, Math.min(value, max));
-  const cx = 60;
-  const cy = 70;
-  const r = 50;
+  const displayValue = Math.round(safeValue);
+  const ratio = safeValue > 0 ? (Math.max(min, safeValue) - min) / (max - min) : 0;
+  const cx = 120;
+  const cy = 145;
+  const arcRadius = 97;
+  const innerRadius = 57;
+  const needleBaseRadius = innerRadius - 2;
+  const needleTipRadius = 93;
+  const needleHalfWidth = 11;
+  const needleDeg = 180 - ratio * 180;
+  const arcGradientId = `${gradientId}-arc`;
+  const scoreFillId = `${gradientId}-score-fill`;
+  const needleFillId = `${gradientId}-needle`;
+  const arcShadowId = `${gradientId}-arc-shadow`;
+  const scoreShadowId = `${gradientId}-score-shadow`;
 
-  // Arc goes left to right (clockwise, sweep-flag=1)
-  const startAngle = Math.PI;        // leftmost point
-  const endAngle = 0;                // rightmost point
-  const ratio = safeValue / max;
-  const needleAngle = Math.PI + ratio * Math.PI; // left → right
-
-  function polar(a) {
-    return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+  function polar(radius, angleDeg) {
+    const angle = (angleDeg * Math.PI) / 180;
+    return [cx + radius * Math.cos(angle), cy - radius * Math.sin(angle)];
   }
 
-  const [sx, sy] = polar(startAngle);
-  const [ex, ey] = polar(endAngle);
+  function arcPath(radius, fromDeg, toDeg) {
+    const [sx, sy] = polar(radius, fromDeg);
+    const [ex, ey] = polar(radius, toDeg);
+    const largeArc = Math.abs(fromDeg - toDeg) > 180 ? 1 : 0;
+    return `M ${sx} ${sy} A ${radius} ${radius} 0 ${largeArc} 1 ${ex} ${ey}`;
+  }
 
-  const needleLen = r - 10;
-  const nx = cx + needleLen * Math.cos(needleAngle);
-  const ny = cy + needleLen * Math.sin(needleAngle);
+  function getActiveScoreStyle(scoreRatio) {
+    if (scoreRatio < 0.25) {
+      return { from: '#e00000', to: '#ff2f12', text: 'white' };
+    }
+    if (scoreRatio < 0.5) {
+      return { from: '#ff5f14', to: '#ff9418', text: 'white' };
+    }
+    if (scoreRatio < 0.7) {
+      return { from: '#ffd400', to: '#fff05a', text: '#374151' };
+    }
+    return { from: '#35d85f', to: '#079642', text: 'white' };
+  }
+
+  const activeScoreStyle = getActiveScoreStyle(ratio);
+  const needleAngle = (needleDeg * Math.PI) / 180;
+  const [needleBaseX, needleBaseY] = polar(needleBaseRadius, needleDeg);
+  const [needleTipX, needleTipY] = polar(needleTipRadius, needleDeg);
+  const perpendicularX = -Math.sin(needleAngle);
+  const perpendicularY = -Math.cos(needleAngle);
+  const needleLeftX = needleBaseX + perpendicularX * needleHalfWidth;
+  const needleLeftY = needleBaseY + perpendicularY * needleHalfWidth;
+  const needleRightX = needleBaseX - perpendicularX * needleHalfWidth;
+  const needleRightY = needleBaseY - perpendicularY * needleHalfWidth;
 
   return (
-    <svg viewBox="0 0 120 100" className="block h-full w-full" aria-hidden="true">
+    <svg viewBox="0 0 240 170" className="block h-full w-full" aria-hidden="true">
       <defs>
-        <linearGradient id={gradientId} x1="10" y1="0" x2="110" y2="0" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#991b1b" />
-          <stop offset="25%" stopColor="#ef4444" />
-          <stop offset="50%" stopColor="#f59e0b" />
-          <stop offset="75%" stopColor="#84cc16" />
-          <stop offset="100%" stopColor="#16a34a" />
+        <linearGradient id={arcGradientId} x1="22" y1="145" x2="218" y2="145" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#e00000" />
+          <stop offset="25%" stopColor="#ff3012" />
+          <stop offset="43%" stopColor="#ff8a18" />
+          <stop offset="58%" stopColor="#ffd800" />
+          <stop offset="70%" stopColor="#fff35d" />
+          <stop offset="84%" stopColor="#35d85f" />
+          <stop offset="100%" stopColor="#079b45" />
         </linearGradient>
+        <linearGradient id={scoreFillId} x1="63" y1="89" x2="177" y2="157" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor={activeScoreStyle.from} />
+          <stop offset="100%" stopColor={activeScoreStyle.to} />
+        </linearGradient>
+        <linearGradient id={needleFillId} x1="76" y1="70" x2="135" y2="145" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#64748b" />
+          <stop offset="100%" stopColor="#374151" />
+        </linearGradient>
+        <filter id={arcShadowId} x="-20%" y="-25%" width="140%" height="160%">
+          <feDropShadow dx="0" dy="4" stdDeviation="3" floodColor="#64748b" floodOpacity="0.18" />
+        </filter>
+        <filter id={scoreShadowId} x="-25%" y="-35%" width="150%" height="165%">
+          <feDropShadow dx="0" dy="3" stdDeviation="2.4" floodColor="#64748b" floodOpacity="0.18" />
+        </filter>
       </defs>
 
-      {/* Track arc — clockwise (sweep-flag=1) */}
       <path
-        d={`M ${sx} ${sy} A ${r} ${r} 0 0 1 ${ex} ${ey}`}
+        d={arcPath(arcRadius, 180, 0)}
         fill="none"
-        stroke="#e5e7eb"
-        strokeWidth="10"
-        strokeLinecap="round"
+        stroke="#e4ebf1"
+        strokeWidth="38"
+        strokeLinecap="butt"
+        filter={`url(#${arcShadowId})`}
       />
 
-      {/* Gradient arc — clockwise (sweep-flag=1) */}
       <path
-        d={`M ${sx} ${sy} A ${r} ${r} 0 0 1 ${ex} ${ey}`}
+        d={arcPath(arcRadius, 180, 0)}
         fill="none"
-        stroke={`url(#${gradientId})`}
-        strokeWidth="10"
-        strokeLinecap="round"
+        stroke={`url(#${arcGradientId})`}
+        strokeWidth="32"
+        strokeLinecap="butt"
       />
 
-      {/* Needle */}
-      <line
-        x1={cx}
-        y1={cy}
-        x2={nx}
-        y2={ny}
-        stroke="#1f2937"
-        strokeWidth="2.5"
-        strokeLinecap="round"
+      <path
+        d={`M ${cx - innerRadius} ${cy} A ${innerRadius} ${innerRadius} 0 0 1 ${cx + innerRadius} ${cy} L ${cx - innerRadius} ${cy} Z`}
+        fill={`url(#${scoreFillId})`}
+        stroke="#dfe7ee"
+        strokeWidth="5"
+        filter={`url(#${scoreShadowId})`}
       />
-      <circle cx={cx} cy={cy} r="4.5" fill="#1f2937" />
-      <circle cx={cx} cy={cy} r="2" fill="white" />
 
-      {/* Value */}
-      <text x={cx} y={cy + 18} textAnchor="middle">
-        <tspan fontSize="15" fontWeight="800" fill="#111827">{safeValue}</tspan>
-        <tspan fontSize="9" fill="#9ca3af">/{max}</tspan>
+      <polygon
+        points={`${needleLeftX},${needleLeftY} ${needleTipX},${needleTipY} ${needleRightX},${needleRightY}`}
+        fill={`url(#${needleFillId})`}
+      />
+
+      <text x={cx} y="132" textAnchor="middle">
+        <tspan fontSize="38" fontWeight="800" fill={activeScoreStyle.text}>{displayValue}</tspan>
       </text>
     </svg>
   );
 }
 
-function BureauCol({ name, score, max, gaugeId }) {
-  const progress = Math.round((Math.max(0, Math.min(score, max)) / max) * 100);
+function BureauCol({ name, score, max, gaugeId, logoSrc }) {
+  const logoClass = name === 'Experian'
+    ? 'h-9 w-auto max-w-[150px] object-contain'
+    : 'h-7 w-auto max-w-[150px] object-contain';
 
   return (
-    <div className="flex h-full w-full min-w-0 flex-col">
-      <p className="text-sm font-semibold text-gray-700">{name}</p>
-
-      <div className="flex h-[270px] items-center justify-center px-1">
-        <div className="h-[250px] w-[300px] max-w-full">
-          <SpeedometerGauge value={score} max={max} gradientId={gaugeId} />
-        </div>
+    <div className="flex h-full w-full min-w-0 flex-col items-center text-center">
+      <div className="flex h-10 w-full items-center justify-center">
+        <img
+          src={logoSrc}
+          alt={name}
+          className={logoClass}
+        />
       </div>
 
-      <div className="mt-auto">
-        <div className="mb-1 flex items-center justify-between text-xs">
-          <span className="text-gray-500 font-medium">Progress</span>
-          <span className="font-bold text-gray-800">{progress}%</span>
-        </div>
-        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-          <div
-            className="h-full rounded-full bg-gray-900 transition-all duration-300"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-        <div className="mt-2 flex items-center justify-between text-xs">
-          <span className="font-semibold text-green-600">+0 points</span>
-          <span className="text-gray-400">this month</span>
+      <div className="flex h-[135px] w-full items-center justify-center">
+        <div className="h-[122px] w-[185px] max-w-full">
+          <SpeedometerGauge value={score} max={max} gradientId={gaugeId} />
         </div>
       </div>
     </div>
@@ -202,22 +237,22 @@ function CreditBureauReportsCard() {
   }, []);
 
   const bureaus = [
-    { name: 'Equifax', score: toScore(scores.Equifax) },
-    { name: 'Experian', score: toScore(scores.Experian) },
-    { name: 'TransUnion', score: toScore(scores.TransUnion) },
+    { name: 'Equifax', score: toScore(scores.Equifax), logoSrc: './assets/equifax-logo.svg' },
+    { name: 'Experian', score: toScore(scores.Experian), logoSrc: './assets/experian-logo.svg' },
+    { name: 'TransUnion', score: toScore(scores.TransUnion), logoSrc: './assets/transunion-logo.svg' },
   ];
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-6 py-5">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm w-full min-h-[240px] px-4 py-3">
       {(loading || error) && (
         <div className="mb-3 flex justify-end">
           {loading && <span className="text-xs text-gray-400">Loading...</span>}
           {!loading && error && <span className="text-xs text-red-500">{error}</span>}
         </div>
       )}
-      <div className="grid grid-cols-1 divide-y divide-gray-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+      <div className="grid min-h-[214px] grid-cols-1 content-center gap-2 sm:grid-cols-3">
         {bureaus.map((b, i) => (
-          <div key={b.name} className="py-4 first:pt-0 last:pb-0 sm:flex sm:px-5 sm:py-0">
+          <div key={b.name} className="py-1 first:pt-0 last:pb-0 sm:flex sm:px-2 sm:py-0">
             <BureauCol {...b} max={MAX_SCORE} gaugeId={`gauge-${i}`} />
           </div>
         ))}

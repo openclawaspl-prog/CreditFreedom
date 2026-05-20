@@ -131,7 +131,7 @@ function CommentsCard() {
   };
 
   const handlePostComment = () => {
-    if (!newComment.trim() || !recordId) return;
+    if (posting || !newComment.trim() || !recordId) return;
 
     setPosting(true);
     const commentText = newComment;
@@ -173,6 +173,12 @@ function CommentsCard() {
         setError("Failed to post comment");
         setPosting(false);
       });
+  };
+
+  const handleCommentKeyDown = (event) => {
+    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    handlePostComment();
   };
 
   useEffect(() => {
@@ -228,6 +234,7 @@ function CommentsCard() {
           <textarea
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
+            onKeyDown={handleCommentKeyDown}
             placeholder="Add your comment here..."
             className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-violet-400 transition-all"
             rows="3"

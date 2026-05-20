@@ -39,23 +39,23 @@ function CreditBureauAutomationCard() {
   const bureaus = ['Equifax', 'TransUnion', 'Experian'];
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm w-full lg:w-4/5 min-h-[240px] px-5 pt-5 pb-4">
       <h2 className="text-base font-bold text-gray-900 mb-4">Credit Bureau Automation</h2>
 
       {/* Auto bot toggle */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="grid max-w-[310px] grid-cols-[minmax(0,1fr)_36px] items-center gap-2 mb-4">
         <span className="text-sm text-gray-600">Pick for Auto Bot (CreditKarma)</span>
         <AutoToggle checked={autoBot} onChange={setAutoBot} />
       </div>
 
       {/* Bureau selector */}
       <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Bureau Selection</p>
-      <div className="flex gap-2 mb-5">
+      <div className="grid max-w-[315px] grid-cols-3 gap-2 mb-4">
         {bureaus.map(b => (
           <button
             key={b}
             onClick={() => setSelected(b)}
-            className={`flex-1 py-2 text-xs font-semibold rounded-lg border transition-colors ${
+            className={`py-2 text-xs font-semibold rounded-lg border transition-colors ${
               selected === b
                 ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
                 : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
@@ -67,12 +67,12 @@ function CreditBureauAutomationCard() {
       </div>
 
       {/* Action buttons */}
-      <div className="flex gap-2">
-        <button className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold transition-colors">
+      <div className="grid max-w-[315px] grid-cols-[minmax(0,1fr)_112px] gap-2">
+        <button className="flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold transition-colors">
           <UploadIcon />
           Experian File Upload
         </button>
-        <button className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors whitespace-nowrap">
+        <button className="flex items-center justify-center gap-1.5 px-2.5 py-2.5 rounded-lg border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50 transition-colors whitespace-nowrap">
           <PrintIcon />
           Print Letter
         </button>

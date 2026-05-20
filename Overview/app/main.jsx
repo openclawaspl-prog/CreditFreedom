@@ -235,14 +235,16 @@ const MainWidget = () => {
           </div>
         </div>
 
-        <CreditBureauReportsCard />
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
+          <CreditBureauReportsCard />
+          <MessageTemplatesCard />
+        </div>
         <StartedAccountsCard />
         <AlertcontrolPanelCard />
       </div>
 
       <div className="space-y-4">
         <CommentsCard />
-        <MessageTemplatesCard />
         <CreditBureauAutomationCard />
         <ProgramEligibilityCard />
         <ActivitiesCard />

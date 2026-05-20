@@ -30,7 +30,7 @@ function ProgramEligibilityCard() {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm w-full min-h-[240px] px-4 pt-5 pb-4">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm w-full min-h-[240px] px-5 pt-5 pb-4">
       <h2 className="text-base font-bold text-gray-900 mb-4">Program Eligibility</h2>
 
       {/* Loan eligibility */}

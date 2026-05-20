@@ -65,7 +65,10 @@ function MessageTemplatesCard() {
       return;
     }
 
-    const previousState = state;
+    const monthsToRollback = [];
+    for (let month = 1; month <= n; month++) {
+      if (!state[month]) monthsToRollback.push(month);
+    }
     setSaving((prev) => ({ ...prev, [n]: true }));
     setError('');
     setState((prev) => {
@@ -83,7 +86,14 @@ function MessageTemplatesCard() {
       Trigger: ['workflow'],
     })
       .catch(() => {
-        setState(previousState);
+        setState((prev) => {
+          const next = { ...prev };
+          monthsToRollback.forEach((month) => {
+            const hasHigherUpdatedMonth = [2, 3].some((higherMonth) => higherMonth > month && prev[higherMonth]);
+            if (!hasHigherUpdatedMonth) next[month] = false;
+          });
+          return next;
+        });
         setError(`Failed to update Month ${n}.`);
       })
       .finally(() => {

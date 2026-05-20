@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login Credentials</title>
+    
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script>
+    window.__cfNativeAddEventListener = window.addEventListener;
+    window.addEventListener = function (type, listener, options) {
+      if (type === 'unload') return;
+      return window.__cfNativeAddEventListener.call(this, type, listener, options);
+    };
+  </script>
+  <script src="https://live.zwidgets.com/js-sdk/1.1/ZohoEmbededAppSDK.min.js"></script>
+  <script>
+    window.addEventListener = window.__cfNativeAddEventListener;
+    delete window.__cfNativeAddEventListener;
+  </script>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f7fb;
+      --panel: rgba(255, 255, 255, 0.82);
+      --text: #141821;
+      --muted: #5f6675;
+      --border: rgba(27, 33, 48, 0.08);
+      --shadow: 0 24px 60px rgba(24, 32, 46, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body,
+    #root {
+      min-height: 100%;
+    }
+
+    html {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: Inter, system-ui, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 8% 10%, rgba(99, 102, 241, 0.16), transparent 28rem),
+        radial-gradient(circle at 90% 8%, rgba(45, 212, 191, 0.18), transparent 30rem),
+        linear-gradient(90deg, rgba(215, 221, 255, 0.74) 0%, rgba(255, 255, 255, 0.96) 26%, rgba(255, 255, 255, 0.96) 74%, rgba(219, 249, 250, 0.78) 100%);
+      background-attachment: fixed;
+    }
+
+    #root {
+      position: relative;
+      z-index: 1;
+    }
+
+    .app-shell {
+      position: relative;
+      padding: 24px;
+      overflow: hidden;
+    }
+
+    .page-title {
+      font-family: Inter, system-ui, sans-serif;
+      letter-spacing: 0;
+    }
+
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 24px;
+    }
+
+    .card {
+      position: relative;
+      min-height: 284px;
+      border-radius: 12px;
+      padding: 28px 28px 26px;
+      border: 1px solid rgba(255, 255, 255, 0.56);
+      box-shadow:
+        0 22px 46px rgba(15, 23, 42, 0.10),
+        inset 0 1px 0 rgba(255, 255, 255, 0.78);
+      backdrop-filter: blur(18px) saturate(145%);
+      -webkit-backdrop-filter: blur(18px) saturate(145%);
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.62), transparent 44%),
+        linear-gradient(315deg, rgba(255, 255, 255, 0.26), transparent 52%);
+      opacity: 0.78;
+    }
+
+    .card::after {
+      content: "";
+      position: absolute;
+      inset: auto 18px 0;
+      height: 1px;
+      background: rgba(255, 255, 255, 0.74);
+    }
+
+    .card-title {
+      font-family: Inter, system-ui, sans-serif;
+      letter-spacing: 0;
+    }
+
+    .detail-row {
+      display: grid;
+      grid-template-columns: 116px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+      padding: 8px 0;
+    }
+
+    .detail-label {
+      color: rgba(20, 24, 33, 0.9);
+      font-size: 0.95rem;
+      line-height: 1.45;
+    }
+
+    .detail-value {
+      font-size: 1rem;
+      font-weight: 700;
+      color: rgba(20, 24, 33, 0.92);
+      word-break: break-word;
+    }
+
+    @media (max-width: 640px) {
+      .app-shell {
+        padding: 16px;
+      }
+
+      .detail-row {
+        grid-template-columns: 96px minmax(0, 1fr);
+        gap: 10px;
+      }
+    }
+
+    @media (max-width: 1100px) {
+      .card-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 720px) {
+      .card-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="text/babel" src="./main.js"></script>
+</body>
+
+</html>

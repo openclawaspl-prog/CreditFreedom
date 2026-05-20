@@ -46,7 +46,7 @@ function ProgramEligibilityCard() {
       <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">Available Programs</p>
       <div className="space-y-4">
         {PROGRAMS.map(({ key, emoji, label }) => (
-          <div key={key} className="grid w-[205px] grid-cols-[minmax(0,1fr)_36px] items-end gap-2">
+          <div key={key} className="grid w-full max-w-[205px] grid-cols-[minmax(0,1fr)_36px] items-end gap-2">
             <div className="flex min-w-0 items-start gap-2">
               <span className="text-base select-none">{emoji}</span>
               <span className="min-w-0 text-sm leading-snug text-gray-700">

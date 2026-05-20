@@ -13,9 +13,9 @@ function EligToggle({ checked, onChange }) {
 }
 
 const PROGRAMS = [
-  { key: 'frontOfFile',      emoji: '📁', label: 'Front of file'             },
-  { key: 'achFile',          emoji: '📄', label: 'ACH file'                  },
-  { key: 'financialFreedom', emoji: '🐦', label: 'Financial freedom program' },
+  { key: 'frontOfFile',      emoji: '📁', label: ['Front of file']              },
+  { key: 'achFile',          emoji: '📄', label: ['ACH file']                   },
+  { key: 'financialFreedom', emoji: '🐦', label: ['Financial freedom', 'program'] },
 ];
 
 function ProgramEligibilityCard() {
@@ -30,7 +30,7 @@ function ProgramEligibilityCard() {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm w-full lg:w-4/5 px-5 pt-5 pb-4">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm w-full min-h-[240px] px-5 pt-5 pb-4">
       <h2 className="text-base font-bold text-gray-900 mb-4">Program Eligibility</h2>
 
       {/* Loan eligibility */}
@@ -44,12 +44,16 @@ function ProgramEligibilityCard() {
 
       {/* Programs */}
       <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">Available Programs</p>
-      <div className="max-w-[310px] space-y-4">
+      <div className="max-w-[270px] space-y-4">
         {PROGRAMS.map(({ key, emoji, label }) => (
-          <div key={key} className="grid grid-cols-[minmax(0,1fr)_36px] items-center gap-3">
-            <div className="flex items-center gap-2">
+          <div key={key} className="grid grid-cols-[minmax(0,1fr)_36px] items-end gap-1.5">
+            <div className="flex min-w-0 items-start gap-2">
               <span className="text-base select-none">{emoji}</span>
-              <span className="text-sm text-gray-700">{label}</span>
+              <span className="min-w-0 text-sm leading-snug text-gray-700">
+                {label.map((line) => (
+                  <span key={line} className="block">{line}</span>
+                ))}
+              </span>
             </div>
             <EligToggle checked={programs[key]} onChange={() => toggle(key)} />
           </div>

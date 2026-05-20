@@ -93,19 +93,19 @@ function MessageTemplatesCard() {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm min-h-[240px] px-5 pt-5 pb-4">
+    <div className="flex min-h-[240px] flex-col bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4">
       <h2 className="text-base font-bold text-gray-900 mb-4">Message Templates</h2>
 
       {error && <p className="mb-3 text-xs text-red-500">{error}</p>}
 
-      <div className="space-y-3">
+      <div className="flex flex-1 flex-col justify-center space-y-3">
         {[1, 2, 3].map((n) => {
           const enabled = isEnabled(n);
           const updated = state[n];
           const isSaving = Boolean(saving[n]);
 
           return (
-            <div key={n} className="grid max-w-[230px] grid-cols-[72px_120px] items-center gap-3">
+            <div key={n} className="grid w-full grid-cols-[78px_minmax(0,1fr)] items-center gap-3">
               <p className="text-sm font-medium text-gray-500">Month {n}</p>
               <button
                 type="button"
@@ -115,7 +115,7 @@ function MessageTemplatesCard() {
                   updated
                     ? 'bg-indigo-600 text-white cursor-default'
                     : enabled && !loading
-                      ? 'bg-white-200 border border-gray-200 hover:bg-gray-100 text-black-600'
+                      ? 'bg-white border border-gray-200 hover:bg-gray-100 text-gray-700'
                       : 'bg-gray-100 text-gray-300 cursor-not-allowed'
                 }`}
               >

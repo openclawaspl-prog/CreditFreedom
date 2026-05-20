@@ -30,7 +30,7 @@ function ProgramEligibilityCard() {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm w-full min-h-[240px] px-5 pt-5 pb-4">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm w-full min-h-[240px] px-4 pt-5 pb-4">
       <h2 className="text-base font-bold text-gray-900 mb-4">Program Eligibility</h2>
 
       {/* Loan eligibility */}
@@ -44,9 +44,9 @@ function ProgramEligibilityCard() {
 
       {/* Programs */}
       <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">Available Programs</p>
-      <div className="max-w-[270px] space-y-4">
+      <div className="space-y-4">
         {PROGRAMS.map(({ key, emoji, label }) => (
-          <div key={key} className="grid grid-cols-[minmax(0,1fr)_36px] items-end gap-1.5">
+          <div key={key} className="grid w-[205px] grid-cols-[minmax(0,1fr)_36px] items-end gap-2">
             <div className="flex min-w-0 items-start gap-2">
               <span className="text-base select-none">{emoji}</span>
               <span className="min-w-0 text-sm leading-snug text-gray-700">

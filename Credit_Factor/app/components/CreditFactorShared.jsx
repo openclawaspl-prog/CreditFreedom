@@ -1,6 +1,6 @@
 const { useEffect: useCreditFactorSharedEffect, useRef: useCreditFactorSharedRef, useState: useCreditFactorSharedState } = React;
 
-function CreditFactorDropdown({ label, options, value, onChange, placeholder = 'Select', sortOptions = true }) {
+function CreditFactorDropdown({ label, options, value, onChange, placeholder = 'Select', sortOptions = true, emptyText = '' }) {
   const [open, setOpen] = useCreditFactorSharedState(false);
   const [menuStyle, setMenuStyle] = useCreditFactorSharedState(null);
   const wrapperRef = useCreditFactorSharedRef(null);
@@ -17,7 +17,7 @@ function CreditFactorDropdown({ label, options, value, onChange, placeholder = '
   const sortedOptions = sortOptions
     ? [...normalizedOptions].sort((a, b) => String(a.label).localeCompare(String(b.label)))
     : normalizedOptions;
-  const dropdownSpace = Math.min(options.length * 42 + 24, 240);
+  const dropdownSpace = Math.min(Math.max(normalizedOptions.length, 1) * 42 + 24, 240);
   const activeOption = sortedOptions.find((option) => String(option.value) === String(value));
 
   function requestDropdownResize() {
@@ -99,6 +99,9 @@ function CreditFactorDropdown({ label, options, value, onChange, placeholder = '
           className="rounded-lg border border-gray-200 bg-white shadow-lg max-h-56 overflow-auto"
           style={menuStyle}
         >
+          {!sortedOptions.length && emptyText && (
+            <div className="px-3 py-2 text-sm text-gray-400">{emptyText}</div>
+          )}
           {sortedOptions.map((opt) => (
             <button
               key={String(opt.value)}

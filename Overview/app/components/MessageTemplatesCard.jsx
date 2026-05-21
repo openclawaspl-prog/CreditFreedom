@@ -94,7 +94,7 @@ function MessageTemplatesCard() {
 
   return (
     <div className="flex min-h-[205px] flex-col bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4">
-      <h2 className="text-base font-bold text-gray-900 mb-4">Message Templates</h2>
+      <h2 className="text-base font-bold text-gray-900 mb-4">Auto Signup</h2>
 
       {error && <p className="mb-3 text-xs text-red-500">{error}</p>}
 

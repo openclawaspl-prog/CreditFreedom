@@ -4,6 +4,9 @@ dist/
 build/
 coverage/
 
+# Generated widget bundles
+**/app/**/*.js
+
 # Logs
 logs
 *.log

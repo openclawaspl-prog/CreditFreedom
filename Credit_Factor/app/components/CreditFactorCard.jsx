@@ -2,10 +2,12 @@ function CreditFactorCard({
   provider,
   providerOptions,
   reportDate,
+  reportDateOptions,
   stats,
   loading,
   error,
   recordCount,
+  canSubmit,
   onProviderChange,
   onReportDateChange,
   onSubmit,
@@ -25,21 +27,29 @@ function CreditFactorCard({
               value={provider}
               onChange={onProviderChange}
               options={providerOptions}
+              placeholder="Select Creditor"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-2">Credit Factor Date*</label>
-            <input
-              type="date"
+            <CreditFactorDropdown
+              label="Select Date*"
               value={reportDate}
-              onChange={(event) => onReportDateChange(event.target.value)}
-              className="w-full h-10 rounded-lg border border-gray-200 px-3 text-sm text-gray-700"
+              onChange={onReportDateChange}
+              options={reportDateOptions}
+              placeholder="Select Date"
+              sortOptions={false}
+              emptyText="No records found"
             />
           </div>
           <button
             type="button"
             onClick={onSubmit}
-            className="h-10 px-5 rounded-lg bg-indigo-900 text-white text-sm font-semibold"
+            disabled={!canSubmit}
+            className={`h-10 px-5 rounded-lg text-sm font-semibold ${
+              canSubmit
+                ? 'bg-indigo-900 text-white'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            }`}
           >
             Submit
           </button>

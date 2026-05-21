@@ -240,36 +240,41 @@ const MainWidget = () => {
         <CommentsCard />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:col-span-3 xl:grid-cols-[minmax(520px,1fr)_280px_250px_250px]">
-        <CreditBureauReportsCard />
-        <MessageTemplatesCard />
-        <CreditBureauAutomationCard />
-        <ProgramEligibilityCard />
+      <div className="grid grid-cols-1 items-start gap-4 lg:col-span-3 xl:grid-cols-[minmax(520px,1fr)_280px_250px_250px]">
+        <div className="space-y-4 xl:col-span-2">
+          <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-[minmax(0,1fr)_280px]">
+            <CreditBureauReportsCard />
+            <MessageTemplatesCard />
+          </div>
+          <StartedAccountsCard />
+        </div>
+        <div className="space-y-4 xl:col-span-2">
+          <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
+            <CreditBureauAutomationCard />
+            <ProgramEligibilityCard />
+          </div>
+          <TotalBalanceCard />
+        </div>
       </div>
 
-      <div className="lg:col-span-2 space-y-4">
-        <StartedAccountsCard />
+      <div className="grid grid-cols-1 items-start gap-4 lg:col-span-3 xl:grid-cols-[minmax(680px,1fr)_320px_320px]">
         <AlertcontrolPanelCard />
+        <div className="space-y-4">
+          <ReferralCreditsCard />
+          <AccountsCountChart />
+          <LogginCredentialsCard cardTitles={['Transunion Login']} />
+        </div>
+        <div className="space-y-4">
+          <ActivitiesCard />
+          <LogginCredentialsCard cardTitles={['Equifax Login', 'Experian Monitoring Login']} />
+        </div>
       </div>
 
-      <div className="space-y-4">
-        <ActivitiesCard />
-        <AccountsCountChart />
-        <TotalBalanceCard />
-      </div>
-
-      <div className="space-y-4">
-        <LogginCredentialsCard stretch />
-      </div>
-
-      <div className="space-y-4 lg:col-span-2">
+      <div className="grid grid-cols-1 gap-4 lg:col-span-3 xl:grid-cols-[minmax(820px,1fr)_minmax(300px,460px)]">
         <div className="min-h-[300px] max-h-[440px] aspect-[16/7]">
           <BureauScoreLineChart />
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <BillingNotesCard />
-          <ReferralCreditsCard />
-        </div>
+        <BillingNotesCard />
       </div>
     </div>
   );

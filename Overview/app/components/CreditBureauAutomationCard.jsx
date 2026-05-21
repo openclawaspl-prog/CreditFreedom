@@ -39,7 +39,7 @@ function CreditBureauAutomationCard() {
   const bureaus = ['Equifax', 'TransUnion', 'Experian'];
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm w-full min-h-[240px] px-5 pt-5 pb-4">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm w-full min-h-[260px] px-5 pt-5 pb-4">
       <h2 className="text-base font-bold text-gray-900 mb-4">Credit Bureau Automation</h2>
 
       {/* Auto bot toggle */}
@@ -58,7 +58,7 @@ function CreditBureauAutomationCard() {
           <button
             key={b}
             onClick={() => setSelected(b)}
-            className={`py-2 text-xs font-semibold rounded-lg border transition-colors ${
+            className={`py-2 text-xs font-semibold rounded-lg border transition-colors ${b === 'Experian' ? 'col-span-2' : ''} ${
               selected === b
                 ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
                 : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'

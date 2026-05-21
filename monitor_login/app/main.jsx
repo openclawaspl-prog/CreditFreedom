@@ -1,6 +1,6 @@
 // Entry used by widget.html with React/ReactDOM loaded from CDN globals.
 const { useState, useEffect } = React;
-
+ 
 // 6 color palette that repeats
 const colors = [
   'rgba(238, 244, 255, 0.68)',
@@ -10,49 +10,210 @@ const colors = [
   'rgba(255, 253, 242, 0.68)',
   'rgba(251, 240, 255, 0.68)',
 ];
-
+ 
 const MODULE_NAME = 'Monitoring_Log_In';
-
+ 
 const hasZohoApi = () => (
   typeof ZOHO !== 'undefined' &&
   ZOHO.CRM &&
   ZOHO.CRM.API &&
   ZOHO.CRM.API.searchRecord
 );
-
+ 
 const getPageRecordId = (data) => {
   const entityId = data && data.EntityId;
   if (Array.isArray(entityId)) return entityId[0] || '';
   return entityId || '';
 };
-
+ 
 const getContactLookupValue = (recordId) => ({ id: recordId });
-
+ 
 const MAX_FIELD_LENGTH = 40;
+const MAX_NOTE_LENGTH = 1000;
+const NOTE_PREVIEW_LENGTH = 90;
 const MIN_USERNAME_LENGTH = 5;
 const NAME_REGEX = /^[A-Za-z0-9.@#$ ]+$/;
 const USERNAME_REGEX = /^[A-Za-z0-9.@#$]+$/;
 const PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d).{8,40}$/;
-
-function DetailRow({ label, value }) {
+ 
+function FieldIcon({ label }) {
+  const commonProps = {
+    width: 16,
+    height: 16,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 2,
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round',
+    'aria-hidden': 'true',
+  };
+ 
+  if (label === 'Username') {
+    return (
+      <svg {...commonProps}>
+        <path d="M20 21a8 8 0 0 0-16 0"></path>
+        <circle cx="12" cy="7" r="4"></circle>
+      </svg>
+    );
+  }
+ 
+  if (label === 'Password') {
+    return (
+      <svg {...commonProps}>
+        <rect x="4" y="11" width="16" height="9" rx="2"></rect>
+        <path d="M8 11V7a4 4 0 0 1 8 0v4"></path>
+      </svg>
+    );
+  }
+ 
+  if (label === 'Notes') {
+    return (
+      <svg {...commonProps}>
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <path d="M14 2v6h6"></path>
+        <path d="M8 13h8"></path>
+        <path d="M8 17h5"></path>
+      </svg>
+    );
+  }
+ 
   return (
-    <div className="detail-row">
-      <div className="detail-label">{label}</div>
-      <div className="detail-value">{value}</div>
+    <svg {...commonProps}>
+      <circle cx="12" cy="12" r="9"></circle>
+      <path d="M12 8v8"></path>
+      <path d="M8 12h8"></path>
+    </svg>
+  );
+}
+ 
+function PasswordValue({ password, show }) {
+  const chars = Array.from(password || '');
+  if (!chars.length) return '-';
+ 
+  return (
+    <span className="password-value" aria-label={show ? password : 'Password hidden'}>
+      {chars.map((char, index) => (
+        <span
+          key={`${show ? 'shown' : 'hidden'}-${index}-${char}`}
+          className="password-char"
+          style={{ animationDelay: `${index * 35}ms` }}
+        >
+          {show ? char : '*'}
+        </span>
+      ))}
+    </span>
+  );
+}
+ 
+function NoteValue({ note }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const shouldClamp = (note || '').length > NOTE_PREVIEW_LENGTH;
+ 
+  if (!note) return '-';
+ 
+  return (
+    <div className="note-value">
+      <span className={`note-text ${shouldClamp && !isExpanded ? 'is-clamped' : ''}`}>
+        {note}
+      </span>
+      {shouldClamp && (
+        <button
+          type="button"
+          className="note-toggle"
+          onClick={() => setIsExpanded(prev => !prev)}
+        >
+          {isExpanded ? 'See less' : 'See more'}
+        </button>
+      )}
     </div>
   );
 }
-
-function CredentialCard({ card, index, onEdit, onDelete }) {
+ 
+function copyTextToClipboard(text) {
+  if (!text) return Promise.resolve(false);
+ 
+  if (navigator.clipboard && window.isSecureContext) {
+    return navigator.clipboard.writeText(text).then(() => true);
+  }
+ 
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = document.execCommand('copy');
+  document.body.removeChild(textarea);
+  return Promise.resolve(copied);
+}
+ 
+function DetailRow({ label, value, copyValue }) {
+  const [copied, setCopied] = useState(false);
+ 
+  const handleCopy = () => {
+    copyTextToClipboard(copyValue || '').then((success) => {
+      if (!success) return;
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    });
+  };
+ 
+  return (
+    <div className="detail-row">
+      <div className="detail-label">
+        <span className="detail-icon">
+          <FieldIcon label={label} />
+        </span>
+        {label}
+      </div>
+      <div className="detail-value-wrap">
+        <div className="detail-value">{value}</div>
+        {copyValue && copyValue !== '-' && (
+          <button
+            type="button"
+            className="copy-field-button"
+            onClick={handleCopy}
+            title={copied ? 'Copied' : `Copy ${label}`}
+            aria-label={copied ? `${label} copied` : `Copy ${label}`}
+          >
+            {copied ? (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M20 6 9 17l-5-5"></path>
+              </svg>
+            ) : (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            )}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+ 
+function CredentialCard({ card, index, onEdit, onDelete, showPasswords }) {
+  const [copiedName, setCopiedName] = useState(false);
   const details = [
     // ['URL', card.URL],
-    ['Username', card.Name],
-    ['Password', card.Password],
+    { label: 'Username', value: card.Name || '-', copyValue: card.Name || '' },
+    { label: 'Password', value: <PasswordValue password={card.Password} show={showPasswords} />, copyValue: card.Password || '' },
     // ['Last Import', card.Last_Import],
     // ['Import Status', card.Import_Status],
-    ['Notes', card.Note],
+    { label: 'Notes', value: <NoteValue note={card.Note} />, copyValue: card.Note || '' },
   ];
-
+ 
+  const handleCopyName = () => {
+    copyTextToClipboard(card.Name1 || '').then((success) => {
+      if (!success) return;
+      setCopiedName(true);
+      setTimeout(() => setCopiedName(false), 1200);
+    });
+  };
+ 
   return (
     <article
       className="card group relative"
@@ -83,26 +244,100 @@ function CredentialCard({ card, index, onEdit, onDelete }) {
           </svg>
         </button>
       </div>
-
+ 
       <div className="relative z-10 flex h-full flex-col">
         <div className="flex items-start justify-between gap-4 pr-16">
           <div className="flex-1 min-w-0">
-            <h2 className="card-title text-[1.35rem] font-bold text-slate-800 break-all whitespace-normal">
-              {card.Name1}
-            </h2>
+            <div className="card-title-row">
+              <h2 className="card-title flex items-center gap-3 text-[1.35rem] font-bold text-slate-800 break-all whitespace-normal">
+                <span className="title-icon" aria-hidden="true">
+                  <svg width="32" height="32" viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="6" y="13" width="36" height="27" rx="5"></rect>
+                    <path d="M17 13v-2a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v2"></path>
+                    <path d="M15 8h18"></path>
+                    <circle cx="18" cy="26" r="5"></circle>
+                    <path d="M11 36a7 7 0 0 1 14 0"></path>
+                    <path d="M29 23h9"></path>
+                    <path d="M29 29h9"></path>
+                    <path d="M29 35h6"></path>
+                  </svg>
+                </span>
+                {card.Name1}
+              </h2>
+              {card.Name1 && (
+                <button
+                  type="button"
+                  className="copy-field-button title-copy-button"
+                  onClick={handleCopyName}
+                  title={copiedName ? 'Copied' : 'Copy name'}
+                  aria-label={copiedName ? 'Name copied' : 'Copy name'}
+                >
+                  {copiedName ? (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M20 6 9 17l-5-5"></path>
+                    </svg>
+                  ) : (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         </div>
-
+ 
         <div className="mt-7 space-y-1">
-          {details.map(([label, value]) => (
-            <DetailRow key={label} label={label} value={value || '-'} />
+          {details.map(({ label, value, copyValue }) => (
+            <DetailRow key={label} label={label} value={value || '-'} copyValue={copyValue} />
           ))}
         </div>
       </div>
     </article>
   );
 }
-
+ 
+function DeleteConfirmModal({ card, onCancel, onConfirm }) {
+  if (!card) return null;
+ 
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="confirm-modal">
+        <div className="confirm-icon" aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 6h18"></path>
+            <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+            <path d="M10 11v6"></path>
+            <path d="M14 11v6"></path>
+          </svg>
+        </div>
+        <h2 className="text-xl font-bold text-slate-900">Delete monitoring?</h2>
+        <p className="text-sm leading-6 text-slate-600">
+          Are you sure you want to delete <strong className="font-semibold text-slate-900">{card.Name1 || 'this login'}</strong>? This action cannot be undone.
+        </p>
+        <div className="flex gap-3 pt-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex-1 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => onConfirm(card.id)}
+            className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-red-600/20 transition-colors hover:bg-red-700"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+ 
 function MonitoringModal({ isOpen, onClose, onSave, editingCard }) {
   const [formData, setFormData] = useState({
     Name1: '',
@@ -111,7 +346,7 @@ function MonitoringModal({ isOpen, onClose, onSave, editingCard }) {
     Note: '',
   });
   const [errors, setErrors] = useState({});
-
+ 
   // Update form when editingCard changes
   React.useEffect(() => {
     if (editingCard) {
@@ -121,7 +356,7 @@ function MonitoringModal({ isOpen, onClose, onSave, editingCard }) {
     }
     setErrors({});
   }, [editingCard, isOpen]);
-
+ 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -129,14 +364,14 @@ function MonitoringModal({ isOpen, onClose, onSave, editingCard }) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
   };
-
+ 
   const validateForm = () => {
     const nextErrors = {};
     const trimmedName = formData.Name1.trim();
     const trimmedUserName = formData.Name.trim();
     const trimmedPassword = formData.Password.trim();
     const trimmedNote = formData.Note.trim();
-
+ 
     if (!trimmedName) {
       nextErrors.Name1 = 'Name is required.';
     } else if (trimmedName.length > MAX_FIELD_LENGTH) {
@@ -144,7 +379,7 @@ function MonitoringModal({ isOpen, onClose, onSave, editingCard }) {
     } else if (!NAME_REGEX.test(trimmedName)) {
       nextErrors.Name1 = 'Only letters, numbers, space, ., $, @, # are allowed.';
     }
-
+ 
     if (!trimmedUserName) {
       nextErrors.Name = 'User name is required.';
     } else if (trimmedUserName.length < MIN_USERNAME_LENGTH) {
@@ -154,23 +389,23 @@ function MonitoringModal({ isOpen, onClose, onSave, editingCard }) {
     } else if (!USERNAME_REGEX.test(trimmedUserName)) {
       nextErrors.Name = 'Only letters, numbers, ., @, $, # are allowed.';
     }
-
+ 
     if (!trimmedPassword) {
       nextErrors.Password = 'Password is required.';
     } else if (!PASSWORD_REGEX.test(trimmedPassword)) {
       nextErrors.Password = 'Password must be 8-40 chars with letters and numbers.';
     }
-
+ 
     if (!trimmedNote) {
       nextErrors.Note = 'Note is required.';
-    } else if (trimmedNote.length > MAX_FIELD_LENGTH) {
-      nextErrors.Note = `Note must be ${MAX_FIELD_LENGTH} characters or less.`;
+    } else if (trimmedNote.length > MAX_NOTE_LENGTH) {
+      nextErrors.Note = `Note must be ${MAX_NOTE_LENGTH} characters or less.`;
     }
-
+ 
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
-
+ 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (validateForm()) {
@@ -182,18 +417,18 @@ function MonitoringModal({ isOpen, onClose, onSave, editingCard }) {
       });
     }
   };
-
+ 
   if (!isOpen) return null;
-
+ 
   const isEditing = !!editingCard;
-
+ 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
         <h2 className="text-2xl font-bold text-slate-900">
           {isEditing ? 'Edit Monitoring' : 'Add New Monitoring'}
         </h2>
-        
+       
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Name *</label>
@@ -211,7 +446,7 @@ function MonitoringModal({ isOpen, onClose, onSave, editingCard }) {
               <p className="mt-1 text-xs text-red-600">{errors.Name1}</p>
             )}
           </div>
-
+ 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">User Name</label>
             <input
@@ -227,7 +462,7 @@ function MonitoringModal({ isOpen, onClose, onSave, editingCard }) {
               <p className="mt-1 text-xs text-red-600">{errors.Name}</p>
             )}
           </div>
-
+ 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Password</label>
             <input
@@ -243,23 +478,22 @@ function MonitoringModal({ isOpen, onClose, onSave, editingCard }) {
               <p className="mt-1 text-xs text-red-600">{errors.Password}</p>
             )}
           </div>
-
+ 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Note</label>
-            <input
-              type="text"
+            <textarea
               name="Note"
               value={formData.Note}
               onChange={handleChange}
               placeholder="e.g., Important account"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-slate-900"
-              maxLength={MAX_FIELD_LENGTH}
-            />
+              className="min-h-24 w-full resize-y px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-slate-900"
+              maxLength={MAX_NOTE_LENGTH}
+            ></textarea>
             {errors.Note && (
               <p className="mt-1 text-xs text-red-600">{errors.Note}</p>
             )}
           </div>
-
+ 
           <div className="flex gap-3 pt-4">
             <button
               type="button"
@@ -280,17 +514,17 @@ function MonitoringModal({ isOpen, onClose, onSave, editingCard }) {
     </div>
   );
 }
-
+ 
 function useDynamicHeight() {
   useEffect(() => {
     let timer;
-
+ 
     function sendResize() {
       clearTimeout(timer);
       timer = setTimeout(() => {
         const root = document.getElementById('root');
         if (!root) return;
-
+ 
         const bodyStyle = window.getComputedStyle(document.body);
         const paddingTop = parseFloat(bodyStyle.paddingTop || 0);
         const paddingBottom = parseFloat(bodyStyle.paddingBottom || 0);
@@ -301,30 +535,30 @@ function useDynamicHeight() {
           rootRect.height
         );
         const h = Math.ceil(measuredRootHeight + paddingTop + paddingBottom + 40);
-
+ 
         if (window.ZOHO && window.ZOHO.CRM && window.ZOHO.CRM.UI && window.ZOHO.CRM.UI.Resize) {
           window.ZOHO.CRM.UI.Resize({ height: String(h), width: '0' });
         }
       }, 150);
     }
-
+ 
     function burstResize() {
       sendResize();
       requestAnimationFrame(sendResize);
       [300, 800, 1500, 3000].forEach(delay => setTimeout(sendResize, delay));
     }
-
+ 
     const root = document.getElementById('root');
     const observer = window.ResizeObserver ? new ResizeObserver(sendResize) : null;
     if (root && observer) observer.observe(root);
-
+ 
     window.MonitorLoginWidget = window.MonitorLoginWidget || {};
     window.MonitorLoginWidget.requestResize = sendResize;
-
+ 
     burstResize();
     window.addEventListener('resize', sendResize);
     window.addEventListener('load', burstResize);
-
+ 
     return () => {
       if (observer) observer.disconnect();
       clearTimeout(timer);
@@ -336,17 +570,20 @@ function useDynamicHeight() {
     };
   }, []);
 }
-
+ 
 function App() {
   useDynamicHeight();
-
+ 
   const [cards, setCards] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCard, setEditingCard] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [contactRecordId, setContactRecordId] = useState(null);
-
+  const [showPasswords, setShowPasswords] = useState(false);
+  const [cardPendingDelete, setCardPendingDelete] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+ 
   const fetchRecords = (recordId) => {
     if (!hasZohoApi()) {
       setCards([]);
@@ -354,16 +591,16 @@ function App() {
       setLoadError('Zoho CRM API is not available.');
       return;
     }
-
+ 
     if (!recordId) {
       setIsLoading(false);
       setLoadError('No Contact record id available.');
       return;
     }
-
+ 
     setIsLoading(true);
     setLoadError(null);
-
+ 
     ZOHO.CRM.API.searchRecord({
       Entity: MODULE_NAME,
       Type: 'criteria',
@@ -392,13 +629,13 @@ function App() {
         setIsLoading(false);
       });
   };
-
+ 
   useEffect(() => {
     if (!hasZohoApi()) {
       setIsLoading(false);
       return;
     }
-
+ 
     ZOHO.embeddedApp.on('PageLoad', (data) => {
       const recordId = getPageRecordId(data);
       setContactRecordId(recordId);
@@ -406,18 +643,18 @@ function App() {
     });
     ZOHO.embeddedApp.init();
   }, []);
-
+ 
   const handleSaveCard = (formData) => {
     if (!hasZohoApi()) {
       setLoadError('Zoho CRM API is not available.');
       return;
     }
-
+ 
     if (!contactRecordId) {
       setLoadError('Cannot save without a Contact record id.');
       return;
     }
-
+ 
     if (editingCard) {
       ZOHO.CRM.API.updateRecord({
         Entity: MODULE_NAME,
@@ -451,60 +688,126 @@ function App() {
         });
     }
   };
-
+ 
   const handleDeleteCard = (id) => {
     if (!hasZohoApi()) {
       setLoadError('Zoho CRM API is not available.');
       return;
     }
-
+ 
     ZOHO.CRM.API.deleteRecord({ Entity: MODULE_NAME, RecordID: id })
       .then(() => {
+        setCardPendingDelete(null);
         fetchRecords(contactRecordId);
       })
       .catch(() => {
         setLoadError('Failed to delete record.');
       });
   };
-
+ 
   const handleEditCard = (card) => {
     setEditingCard(card);
     setIsModalOpen(true);
   };
-
+ 
   const handleOpenAddModal = () => {
     setEditingCard(null);
     setIsModalOpen(true);
   };
-
+ 
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingCard(null);
   };
-
+ 
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const filteredCards = normalizedSearch
+    ? cards.filter(card => [
+      card.Name1,
+      card.Name,
+      card.Password,
+      card.Note,
+    ].some(value => String(value || '').toLowerCase().includes(normalizedSearch)))
+    : cards;
+ 
   return (
     <main className="app-shell">
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6">
-        <div className="flex flex-col gap-4 pb-5 sm:flex-row sm:items-center sm:justify-between">
-          <h1 className="page-title text-4xl font-bold text-slate-900">
+        <div className="flex flex-col gap-4 pb-5 lg:flex-row lg:items-center lg:justify-between">
+          {/* <h1 className="page-title text-4xl font-bold text-slate-900">
             Log In Credentials
-          </h1>
-          <button
-            onClick={handleOpenAddModal}
-            type="button"
-            className="inline-flex items-center gap-3 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition-transform hover:-translate-y-0.5 hover:bg-slate-800"
-          >
-            <span className="flex h-5 w-5 items-center justify-center rounded-full border border-white/30 text-lg leading-none">+</span>
-            Add Another Monitoring
-          </button>
+          </h1> */}
+          <label className="search-box">
+            <span className="search-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <path d="M21 21l-4.35-4.35"></path>
+              </svg>
+            </span>
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search logins..."
+              className="search-input"
+              aria-label="Search login credentials"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                className="search-clear"
+                onClick={() => setSearchQuery('')}
+                aria-label="Clear search"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M18 6 6 18"></path>
+                  <path d="m6 6 12 12"></path>
+                </svg>
+              </button>
+            )}
+          </label>
+          <div className="flex items-center gap-3 lg:ml-auto">
+            <button
+              onClick={handleOpenAddModal}
+              type="button"
+              className="inline-flex items-center gap-3 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition-transform hover:-translate-y-0.5 hover:bg-slate-800"
+            >
+              <span className="relative inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-white/30" aria-hidden="true">
+                <span className="absolute h-2.5 w-px rounded-full bg-current"></span>
+                <span className="absolute h-px w-2.5 rounded-full bg-current"></span>
+              </span>
+              Add Another Monitoring
+            </button>
+            <button
+              onClick={() => setShowPasswords(prev => !prev)}
+              type="button"
+              className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-lg shadow-slate-900/20 transition-transform hover:-translate-y-0.5 hover:bg-slate-800"
+              title={showPasswords ? 'Hide passwords' : 'Show passwords'}
+              aria-label={showPasswords ? 'Hide passwords' : 'Show passwords'}
+            >
+              {showPasswords ? (
+                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20C7 20 2.73 16.89 1 12a18.45 18.45 0 0 1 5.06-6.94"></path>
+                  <path d="M9.9 4.24A10.84 10.84 0 0 1 12 4c5 0 9.27 3.11 11 8a18.5 18.5 0 0 1-2.16 3.19"></path>
+                  <path d="M14.12 14.12A3 3 0 0 1 9.88 9.88"></path>
+                  <path d="M1 1l22 22"></path>
+                </svg>
+              ) : (
+                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              )}
+            </button>
+          </div>
         </div>
-
+ 
         {loadError && (
           <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {loadError}
           </div>
         )}
-
+ 
         <section className="card-grid">
           {isLoading ? (
             <div className="col-span-full text-sm text-slate-600">Loading records...</div>
@@ -512,28 +815,40 @@ function App() {
             <div className="col-span-full rounded-2xl border border-slate-200 bg-white/60 px-4 py-6 text-center text-sm text-slate-600">
               No monitoring logins found.
             </div>
+          ) : filteredCards.length === 0 ? (
+            <div className="col-span-full rounded-2xl border border-slate-200 bg-white/60 px-4 py-6 text-center text-sm text-slate-600">
+              No logins match your search.
+            </div>
           ) : (
-            cards.map((card, index) => (
+            filteredCards.map((card, index) => (
               <CredentialCard
                 key={card.id}
                 card={card}
                 index={index}
                 onEdit={handleEditCard}
-                onDelete={handleDeleteCard}
+                onDelete={() => setCardPendingDelete(card)}
+                showPasswords={showPasswords}
               />
             ))
           )}
         </section>
       </div>
-
-      <MonitoringModal 
+ 
+      <MonitoringModal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         onSave={handleSaveCard}
         editingCard={editingCard}
       />
+      <DeleteConfirmModal
+        card={cardPendingDelete}
+        onCancel={() => setCardPendingDelete(null)}
+        onConfirm={handleDeleteCard}
+      />
     </main>
   );
 }
-
+ 
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+ 
+ 

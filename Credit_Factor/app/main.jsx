@@ -1,8 +1,10 @@
-const { useEffect: useResizeEffect, useState: useCreditFactorState } = React;
+const { useEffect: useResizeEffect, useState: useCreditFactorState, useEffect: useCreditFactorEffect } = React;
 
 const CREDIT_FACTOR_BUREAUS = ['Equifax', 'Experian', 'TransUnion'];
-const CHANGE_TYPES = ['All', 'Negative', 'Positive'];
+const CREDIT_UPDATE_BUREAUS = ['Equifax', 'TransUnion'];
+const CHANGE_TYPES = ['All', 'Updated or Removed'];
 const CREDIT_FACTOR_MODULE = 'Credit_Factor';
+const CREDIT_UPDATE_DATA_MODULE = 'credit_update_data';
 
 window.CreditFactorWidget = window.CreditFactorWidget || {
   requestResize() {},
@@ -76,8 +78,31 @@ function normalizeProvider(value) {
   return creditFactorStr(value).trim().toLowerCase().replace(/[\s_-]+/g, '');
 }
 
+function normalizeUpdateBureau(record) {
+  const candidates = [record && record.Block_Tag, record && record.Provider, record && record.Bureau, record && record.Credit_Bureau];
+  for (const candidate of candidates) {
+    const value = normalizeProvider(candidate);
+    if (!value) continue;
+    if (value.includes('equifax')) return 'Equifax';
+    if (value.includes('transunion')) return 'TransUnion';
+    if (value.includes('experian')) return 'Experian';
+  }
+  return '';
+}
+
 function getRecordDate(record) {
   return creditFactorDate(record.Credit_Factor_Date || record.Date || record.Created_Time || record.Modified_Time);
+}
+
+function getUpdateRecordDate(record) {
+  return creditFactorDate(record.Created_Date || record.Created_Time || record.Modified_Time);
+}
+
+function formatUpdateDateLabel(dateValue) {
+  if (!dateValue) return '';
+  const date = new Date(`${dateValue}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return dateValue;
+  return date.toLocaleDateString(undefined, { month: 'short', day: '2-digit', year: 'numeric' });
 }
 
 function latestText(records, field) {
@@ -135,6 +160,36 @@ function filterCreditFactorRecords(records, provider, date) {
   });
 }
 
+function groupCreditUpdateRecords(records) {
+  const grouped = {};
+
+  (records || []).forEach((record) => {
+    const bureau = normalizeUpdateBureau(record);
+    const date = getUpdateRecordDate(record);
+    if (!bureau || !date) return;
+
+    if (!grouped[bureau]) grouped[bureau] = {};
+    if (!grouped[bureau][date]) grouped[bureau][date] = [];
+    grouped[bureau][date].push(record);
+  });
+
+  return grouped;
+}
+
+function getChangeTone(record) {
+  const color = creditFactorStr(record && record.Color_Code).trim().toLowerCase();
+  const tag = creditFactorStr(record && record.Block_Tag).trim().toLowerCase();
+  if (color.includes('green') || /positive|resolved|paid|removed|decrease|good/.test(tag)) return 'positive';
+  if (color.includes('red') || /late|negative|delin|balance increase|charge|collection|hard inquiry/.test(tag)) return 'negative';
+  return 'neutral';
+}
+
+function getChangeStatus(record) {
+  const tag = creditFactorStr(record && record.Block_Tag).trim().toLowerCase();
+  const updateComment = creditFactorStr(record && record.Update_Comment).trim().toLowerCase();
+  return /removed|remove|deleted|delete/.test(`${tag} ${updateComment}`) ? 'Removed' : 'Updated';
+}
+
 async function fetchCreditFactorsByClientId(clientId) {
   if (!clientId || !window.ZOHO || !ZOHO.CRM || !ZOHO.CRM.API || !ZOHO.CRM.API.searchRecord) return [];
 
@@ -146,6 +201,34 @@ async function fetchCreditFactorsByClientId(clientId) {
     const resp = await ZOHO.CRM.API.searchRecord(
       {
         Entity: CREDIT_FACTOR_MODULE,
+        Type: 'criteria',
+        Query: query,
+      },
+      page,
+      perPage
+    );
+
+    const data = (resp && resp.data) || [];
+    all.push(...data);
+
+    const more = resp && resp.info && resp.info.more_records;
+    if (!more || data.length < perPage) break;
+  }
+
+  return all;
+}
+
+async function fetchCreditUpdateDataByClientId(clientId) {
+  if (!clientId || !window.ZOHO || !ZOHO.CRM || !ZOHO.CRM.API || !ZOHO.CRM.API.searchRecord) return [];
+
+  const all = [];
+  const perPage = 200;
+  const query = `(Client:equals:${clientId})`;
+
+  for (let page = 1; page <= 10; page++) {
+    const resp = await ZOHO.CRM.API.searchRecord(
+      {
+        Entity: CREDIT_UPDATE_DATA_MODULE,
         Type: 'criteria',
         Query: query,
       },
@@ -276,6 +359,9 @@ const RootApp = () => {
   const [changeType, setChangeType] = useCreditFactorState('All');
   const [changeBureau, setChangeBureau] = useCreditFactorState(CREDIT_FACTOR_BUREAUS[0]);
   const [changeDate, setChangeDate] = useCreditFactorState('2021-12-28');
+  const [creditUpdateRecords, setCreditUpdateRecords] = useCreditFactorState([]);
+  const [selectedChangeGroup, setSelectedChangeGroup] = useCreditFactorState(null);
+  const [showChangeCards, setShowChangeCards] = useCreditFactorState(false);
   const [disputeProvider, setDisputeProvider] = useCreditFactorState(CREDIT_FACTOR_BUREAUS[0]);
   const [disputeDate, setDisputeDate] = useCreditFactorState('');
 
@@ -284,13 +370,23 @@ const RootApp = () => {
     setLoading(true);
     setError('');
 
-    fetchCreditFactorsByClientId(clientId)
-      .then((rows) => {
-        setRecords(rows);
-      })
-      .catch(() => {
-        setRecords([]);
-        setError('Failed to load credit factor data.');
+    Promise.allSettled([
+      fetchCreditFactorsByClientId(clientId),
+      fetchCreditUpdateDataByClientId(clientId),
+    ])
+      .then(([factorResult, updateResult]) => {
+        if (factorResult.status === 'fulfilled') {
+          setRecords(factorResult.value);
+        } else {
+          setRecords([]);
+          setError('Failed to load credit factor data.');
+        }
+
+        if (updateResult.status === 'fulfilled') {
+          setCreditUpdateRecords(updateResult.value);
+        } else {
+          setCreditUpdateRecords([]);
+        }
       })
       .finally(() => {
         setLoading(false);
@@ -300,6 +396,35 @@ const RootApp = () => {
 
   const filteredRecords = filterCreditFactorRecords(records, appliedProvider, appliedDate);
   const stats = buildCreditFactorStats(filteredRecords);
+  const creditUpdateGroups = groupCreditUpdateRecords(creditUpdateRecords);
+  const activeChangeBureau = CREDIT_UPDATE_BUREAUS.includes(changeBureau)
+    ? changeBureau
+    : CREDIT_UPDATE_BUREAUS[0];
+  const changeDateOptions = activeChangeBureau
+    ? Object.keys(creditUpdateGroups[activeChangeBureau] || {}).sort((a, b) => b.localeCompare(a))
+    : [];
+  const activeChangeDate = changeDateOptions.includes(changeDate)
+    ? changeDate
+    : changeDateOptions[0] || '';
+  const activeChangeRecords = activeChangeBureau && activeChangeDate
+    ? (creditUpdateGroups[activeChangeBureau] && creditUpdateGroups[activeChangeBureau][activeChangeDate]) || []
+    : [];
+  const filteredChangeRecords = activeChangeRecords.filter((record) => {
+    if (changeType === 'All') return true;
+    return getChangeStatus(record) === changeType;
+  });
+
+  useCreditFactorEffect(() => {
+    if (!CREDIT_UPDATE_BUREAUS.includes(changeBureau)) {
+      setChangeBureau(CREDIT_UPDATE_BUREAUS[0]);
+    }
+  }, [changeBureau]);
+
+  useCreditFactorEffect(() => {
+    if (changeDateOptions.length && !changeDateOptions.includes(changeDate)) {
+      setChangeDate(changeDateOptions[0]);
+    }
+  }, [changeDateOptions.join('|'), changeDate]);
 
   function submitReport() {
     setAppliedProvider(reportProvider);
@@ -308,6 +433,17 @@ const RootApp = () => {
   }
 
   function submitChanges() {
+    setSelectedChangeGroup({
+      bureau: activeChangeBureau,
+      date: activeChangeDate,
+      records: filteredChangeRecords,
+    });
+    setShowChangeCards(false);
+    window.CreditFactorWidget?.requestResize?.();
+  }
+
+  function toggleChangeCards() {
+    setShowChangeCards((prev) => !prev);
     window.CreditFactorWidget?.requestResize?.();
   }
 
@@ -342,13 +478,35 @@ const RootApp = () => {
         <WhatsChangedCard
           changeType={changeType}
           changeTypeOptions={CHANGE_TYPES}
-          changeBureau={changeBureau}
-          bureauOptions={CREDIT_FACTOR_BUREAUS}
-          changeDate={changeDate}
-          onChangeTypeChange={setChangeType}
-          onChangeBureauChange={setChangeBureau}
-          onChangeDateChange={setChangeDate}
+          changeBureau={activeChangeBureau}
+          bureauOptions={CREDIT_UPDATE_BUREAUS}
+          changeDate={activeChangeDate}
+          changeDateOptions={changeDateOptions.map((date) => ({
+            label: formatUpdateDateLabel(date),
+            value: date,
+          }))}
+          onChangeTypeChange={(value) => {
+            setChangeType(value);
+            setSelectedChangeGroup(null);
+            setShowChangeCards(false);
+          }}
+          onChangeBureauChange={(bureau) => {
+            setChangeBureau(bureau);
+            const bureauDates = Object.keys(creditUpdateGroups[bureau] || {}).sort((a, b) => b.localeCompare(a));
+            setChangeDate(bureauDates[0] || '');
+            setSelectedChangeGroup(null);
+            setShowChangeCards(false);
+          }}
+          onChangeDateChange={(date) => {
+            setChangeDate(date);
+            setSelectedChangeGroup(null);
+            setShowChangeCards(false);
+          }}
           onSubmit={submitChanges}
+          selectedChangeGroup={selectedChangeGroup}
+          selectedChangeRecords={filteredChangeRecords}
+          showChangeCards={showChangeCards}
+          onToggleChangeCards={toggleChangeCards}
         />
 
         <DisputeDetailsCard

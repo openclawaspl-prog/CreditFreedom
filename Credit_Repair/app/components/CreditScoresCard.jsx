@@ -1,49 +1,107 @@
-/*
-  SpeedometerGauge — geometry matches Overview/CreditBureauReportsCard exactly
-  cx=60, cy=70, r=50, viewBox="0 0 120 100"
-  Arc: M 10 70 A 50 50 0 0 1 110 70  (sweep-flag=1 → clockwise → top arch)
-  Needle: π + ratio×π  (left→up→right via 3π/2 = up)
-  Gradient: dark-red → green, userSpaceOnUse x:10→110
-*/
-function SpeedometerGauge({ score, max, uid }) {
-  const cx = 60, cy = 70, r = 50;
-  const ratio = Math.min(Math.max(score / max, 0), 1);
-  const needleAngle = Math.PI + ratio * Math.PI;
-  const nLen = r - 13;
-  const nx = cx + nLen * Math.cos(needleAngle);
-  const ny = cy + nLen * Math.sin(needleAngle);
-  const gid = `sg-cf-${uid}`;
+function SpeedometerGauge({ score, min = 300, max, uid }) {
+  const safeValue = Math.max(0, Math.min(score, max));
+  const displayValue = Math.round(safeValue);
+  const ratio = safeValue > 0 ? (Math.max(min, safeValue) - min) / (max - min) : 0;
+  const cx = 120;
+  const cy = 145;
+  const arcRadius = 97;
+  const innerRadius = 57;
+  const needleBaseRadius = innerRadius - 2;
+  const needleTipRadius = 93;
+  const needleHalfWidth = 11;
+  const needleDeg = 180 - ratio * 180;
+  const arcGradientId = `sg-cf-${uid}-arc`;
+  const scoreFillId = `sg-cf-${uid}-score-fill`;
+  const needleFillId = `sg-cf-${uid}-needle`;
+  const arcShadowId = `sg-cf-${uid}-arc-shadow`;
+  const scoreShadowId = `sg-cf-${uid}-score-shadow`;
+
+  function polar(radius, angleDeg) {
+    const angle = (angleDeg * Math.PI) / 180;
+    return [cx + radius * Math.cos(angle), cy - radius * Math.sin(angle)];
+  }
+
+  function arcPath(radius, fromDeg, toDeg) {
+    const [sx, sy] = polar(radius, fromDeg);
+    const [ex, ey] = polar(radius, toDeg);
+    const largeArc = Math.abs(fromDeg - toDeg) > 180 ? 1 : 0;
+    return `M ${sx} ${sy} A ${radius} ${radius} 0 ${largeArc} 1 ${ex} ${ey}`;
+  }
+
+  function getActiveScoreStyle(scoreRatio) {
+    if (scoreRatio < 0.25) return { from: '#e00000', to: '#ff2f12', text: 'white' };
+    if (scoreRatio < 0.5) return { from: '#ff5f14', to: '#ff9418', text: 'white' };
+    if (scoreRatio < 0.7) return { from: '#ffd400', to: '#fff05a', text: '#374151' };
+    return { from: '#35d85f', to: '#079642', text: 'white' };
+  }
+
+  const activeScoreStyle = getActiveScoreStyle(ratio);
+  const needleAngle = (needleDeg * Math.PI) / 180;
+  const [needleBaseX, needleBaseY] = polar(needleBaseRadius, needleDeg);
+  const [needleTipX, needleTipY] = polar(needleTipRadius, needleDeg);
+  const perpendicularX = -Math.sin(needleAngle);
+  const perpendicularY = -Math.cos(needleAngle);
+  const needleLeftX = needleBaseX + perpendicularX * needleHalfWidth;
+  const needleLeftY = needleBaseY + perpendicularY * needleHalfWidth;
+  const needleRightX = needleBaseX - perpendicularX * needleHalfWidth;
+  const needleRightY = needleBaseY - perpendicularY * needleHalfWidth;
 
   return (
-    <svg viewBox="0 0 120 100" style={{ width: '100%', height: 'auto' }}>
+    <svg viewBox="0 0 240 170" className="block h-full w-full" aria-hidden="true">
       <defs>
-        <linearGradient id={gid} x1="10" y1="0" x2="110" y2="0" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#991b1b" />
-          <stop offset="25%" stopColor="#ef4444" />
-          <stop offset="50%" stopColor="#f59e0b" />
-          <stop offset="75%" stopColor="#84cc16" />
-          <stop offset="100%" stopColor="#16a34a" />
+        <linearGradient id={arcGradientId} x1="22" y1="145" x2="218" y2="145" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#e00000" />
+          <stop offset="25%" stopColor="#ff3012" />
+          <stop offset="43%" stopColor="#ff8a18" />
+          <stop offset="58%" stopColor="#ffd800" />
+          <stop offset="70%" stopColor="#fff35d" />
+          <stop offset="84%" stopColor="#35d85f" />
+          <stop offset="100%" stopColor="#079b45" />
         </linearGradient>
+        <linearGradient id={scoreFillId} x1="63" y1="89" x2="177" y2="157" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor={activeScoreStyle.from} />
+          <stop offset="100%" stopColor={activeScoreStyle.to} />
+        </linearGradient>
+        <linearGradient id={needleFillId} x1="76" y1="70" x2="135" y2="145" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#64748b" />
+          <stop offset="100%" stopColor="#374151" />
+        </linearGradient>
+        <filter id={arcShadowId} x="-20%" y="-25%" width="140%" height="160%">
+          <feDropShadow dx="0" dy="4" stdDeviation="3" floodColor="#64748b" floodOpacity="0.18" />
+        </filter>
+        <filter id={scoreShadowId} x="-25%" y="-35%" width="150%" height="165%">
+          <feDropShadow dx="0" dy="3" stdDeviation="2.4" floodColor="#64748b" floodOpacity="0.18" />
+        </filter>
       </defs>
 
-      {/* Gray background track */}
-      <path d="M 10 70 A 50 50 0 0 1 110 70"
-        fill="none" stroke="#e5e7eb" strokeWidth="10" strokeLinecap="round" />
-
-      {/* Gradient colour track */}
-      <path d="M 10 70 A 50 50 0 0 1 110 70"
-        fill="none" stroke={`url(#${gid})`} strokeWidth="10" strokeLinecap="round" />
-
-      {/* Needle */}
-      <line x1={cx} y1={cy} x2={nx} y2={ny}
-        stroke="#1f2937" strokeWidth="2.5" strokeLinecap="round" />
-      <circle cx={cx} cy={cy} r="4.5" fill="#1f2937" />
-      <circle cx={cx} cy={cy} r="2" fill="white" />
-
-      {/* Score label */}
-      <text x={cx} y={cy + 16} textAnchor="middle">
-        <tspan fontSize="14" fontWeight="700" fill="#111827">{score}</tspan>
-        <tspan fontSize="9" fill="#9ca3af">/{max}</tspan>
+      <path
+        d={arcPath(arcRadius, 180, 0)}
+        fill="none"
+        stroke="#e4ebf1"
+        strokeWidth="38"
+        strokeLinecap="butt"
+        filter={`url(#${arcShadowId})`}
+      />
+      <path
+        d={arcPath(arcRadius, 180, 0)}
+        fill="none"
+        stroke={`url(#${arcGradientId})`}
+        strokeWidth="32"
+        strokeLinecap="butt"
+      />
+      <path
+        d={`M ${cx - innerRadius} ${cy} A ${innerRadius} ${innerRadius} 0 0 1 ${cx + innerRadius} ${cy} L ${cx - innerRadius} ${cy} Z`}
+        fill={`url(#${scoreFillId})`}
+        stroke="#dfe7ee"
+        strokeWidth="5"
+        filter={`url(#${scoreShadowId})`}
+      />
+      <polygon
+        points={`${needleLeftX},${needleLeftY} ${needleTipX},${needleTipY} ${needleRightX},${needleRightY}`}
+        fill={`url(#${needleFillId})`}
+      />
+      <text x={cx} y="132" textAnchor="middle">
+        <tspan fontSize="38" fontWeight="800" fill={activeScoreStyle.text}>{displayValue}</tspan>
       </text>
     </svg>
   );
@@ -127,33 +185,20 @@ async function fetchLatestCreditScores(clientId) {
   return latestScores;
 }
 
-function ScoreCol({ name, score, max, delta }) {
-  const progress = Math.round((score / max) * 100);
-  const positive = delta >= 0;
+function ScoreCol({ name, score, max, logoSrc }) {
+  const logoClass = name === 'Experian'
+    ? 'h-9 w-auto max-w-[150px] object-contain'
+    : 'h-7 w-auto max-w-[150px] object-contain';
 
   return (
-    <div className="flex-1 min-w-0">
-      <p className="text-xs font-semibold text-gray-700 mb-1 truncate">{name}</p>
-
-      <SpeedometerGauge score={score} max={max} uid={name} />
-
-      {/* Progress bar */}
-      <div className="mt-1">
-        <div className="flex items-center justify-between text-[11px] mb-1">
-          <span className="text-gray-500 font-medium">Progress</span>
-          <span className="font-bold text-gray-800">{progress}%</span>
-        </div>
-        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-          <div className="h-full bg-gray-800 rounded-full" style={{ width: `${progress}%` }} />
-        </div>
+    <div className="flex h-full w-full min-w-0 flex-col items-center text-center">
+      <div className="flex h-10 w-full items-center justify-center">
+        <img src={logoSrc} alt={name} className={logoClass} />
       </div>
-
-      {/* Delta */}
-      <div className="flex items-center justify-between mt-1.5 text-[11px]">
-        <span className={`font-semibold whitespace-nowrap ${positive ? 'text-green-600' : 'text-red-500'}`}>
-          {positive ? '+' : ''}{delta} points
-        </span>
-        <span className="text-gray-400 whitespace-nowrap">this month</span>
+      <div className="flex h-[118px] w-full items-center justify-center">
+        <div className="h-[108px] w-[164px] max-w-full">
+          <SpeedometerGauge score={score} max={max} uid={name} />
+        </div>
       </div>
     </div>
   );
@@ -196,27 +241,24 @@ function CreditScoresCard({ record, contactId }) {
   }, [clientId]);
 
   const cols = [
-    { name: 'Equifax', score: toCreditScore(scores.Equifax), delta: Number(record.Equifax_Delta) || 0 },
-    { name: 'Experian', score: toCreditScore(scores.Experian), delta: Number(record.Experian_Delta) || 0 },
-    { name: 'TransUnion', score: toCreditScore(scores.TransUnion), delta: Number(record.Transunion_Delta) || 0 },
+    { name: 'Equifax', score: toCreditScore(scores.Equifax), logoSrc: './assets/equifax-logo.svg' },
+    { name: 'Experian', score: toCreditScore(scores.Experian), logoSrc: './assets/experian-logo.svg' },
+    { name: 'TransUnion', score: toCreditScore(scores.TransUnion), logoSrc: './assets/transunion-logo.svg' },
   ];
 
   return (
-    <div className="cf-glass bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4">
+    <div className="cf-glass bg-white rounded-xl border border-gray-200 shadow-sm w-full min-h-[205px] px-4 py-3">
       {(loading || error) && (
         <div className="mb-3 flex justify-end">
           {loading && <span className="text-xs text-gray-400">Loading...</span>}
           {!loading && error && <span className="text-xs text-red-500">{error}</span>}
         </div>
       )}
-      <div className="flex gap-4">
-        {cols.map((c, i) => (
-          <React.Fragment key={c.name}>
+      <div className="grid min-h-[179px] grid-cols-1 content-center gap-2 sm:grid-cols-3">
+        {cols.map((c) => (
+          <div key={c.name} className="py-1 first:pt-0 last:pb-0 sm:flex sm:px-2 sm:py-0">
             <ScoreCol {...c} max={MAX} />
-            {i < cols.length - 1 && (
-              <div className="w-px flex-shrink-0 self-stretch bg-gray-100" />
-            )}
-          </React.Fragment>
+          </div>
         ))}
       </div>
     </div>

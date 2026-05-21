@@ -17,10 +17,10 @@ function ActivitiesCard() {
   const visible = MOCK_ACTIVITIES.slice(0, MAX_VISIBLE);
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4">
-      <h2 className="text-base font-bold text-gray-900 mb-4">Activities</h2>
+    <div className="min-h-[365px] bg-white rounded-xl border border-gray-200 shadow-sm px-4 pt-4 pb-3">
+      <h2 className="text-base font-bold text-gray-900 mb-3">Activities</h2>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         {visible.map(a => {
           const style = STATUS_STYLE[a.status] || { dot: 'bg-gray-400', text: 'text-gray-500' };
           return (

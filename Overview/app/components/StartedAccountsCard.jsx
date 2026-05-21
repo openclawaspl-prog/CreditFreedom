@@ -177,7 +177,7 @@ function StartedAccountsCard() {
   const headers = ['Account Name', 'Type', 'Bureau', 'Balance', 'Status', 'Actions'];
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm pt-5 pb-4">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm w-full pt-5 pb-4">
       <style>
         {`
           .overview-started-scroll {
@@ -222,18 +222,26 @@ function StartedAccountsCard() {
           }
         `}
       </style>
-      <div className="mb-4 flex items-center justify-between gap-3 px-5">
+      <div className="mb-3 flex items-center justify-between gap-3 px-4">
         <h2 className="text-base font-bold text-gray-900">Started Accounts</h2>
         {loading && <span className="text-xs text-gray-400">Loading...</span>}
         {!loading && error && <span className="text-xs text-red-500">{error}</span>}
       </div>
 
-      <div className={`overview-started-scroll overflow-x-auto rounded-b-xl bg-white${needsScroll ? ' max-h-[236px] overflow-y-auto' : ''}`}>
-        <table className="w-full text-[15px]">
+      <div className={`overview-started-scroll overflow-x-hidden rounded-b-xl bg-white${needsScroll ? ' max-h-[236px] overflow-y-auto' : ''}`}>
+        <table className="w-full table-fixed text-sm">
+          <colgroup>
+            <col className="w-[31%]" />
+            <col className="w-[10%]" />
+            <col className="w-[16%]" />
+            <col className="w-[22%]" />
+            <col className="w-[14%]" />
+            <col className="w-[7%]" />
+          </colgroup>
           <thead className="sticky top-0 z-10 bg-white">
             <tr className="border-b border-gray-200 shadow-[0_1px_0_rgba(15,23,42,0.04)]">
               {headers.map(h => (
-                <th key={h} className="text-left text-[13px] font-bold text-black py-3.5 pl-5 pr-6 last:pr-5 whitespace-nowrap">
+                <th key={h} className="text-left text-[11px] font-bold text-black py-2.5 pl-3 pr-2 last:pr-3 whitespace-nowrap">
                   {h}
                 </th>
               ))}
@@ -247,16 +255,16 @@ function StartedAccountsCard() {
             )}
             {accounts.map(acc => (
               <tr key={acc.id} className="border-b border-gray-100/80 last:border-0 transition-colors hover:bg-slate-50/70">
-                <td className="py-3.5 pl-5 pr-6 text-[15px] text-gray-800 whitespace-nowrap">{acc.name}</td>
-                <td className="py-3.5 pl-5 pr-6 text-[15px] text-gray-600">{acc.type}</td>
-                <td className="py-3.5 pl-5 pr-6 text-[15px] text-gray-600">{acc.bureau}</td>
-                <td className="py-3.5 pl-5 pr-6 text-[15px] text-gray-600">{acc.balance}</td>
-                <td className="py-3.5 pl-5 pr-6 whitespace-nowrap">
-                  <span className="inline-flex min-w-max items-center whitespace-nowrap text-[13px] font-semibold text-green-700 bg-green-100 px-2.5 py-1 rounded-full">
+                <td className="py-2.5 pl-3 pr-2 text-xs text-gray-800 truncate">{acc.name}</td>
+                <td className="py-2.5 pl-3 pr-2 text-xs text-gray-600 truncate">{acc.type}</td>
+                <td className="py-2.5 pl-3 pr-2 text-xs text-gray-600 truncate">{acc.bureau}</td>
+                <td className="py-2.5 pl-3 pr-2 text-xs text-gray-600 truncate">{acc.balance}</td>
+                <td className="py-2.5 pl-3 pr-2 whitespace-nowrap">
+                  <span className="inline-flex max-w-full items-center whitespace-nowrap text-[11px] font-semibold text-green-700 bg-green-100 px-1.5 py-0.5 rounded-full">
                     {acc.status}
                   </span>
                 </td>
-                <td className="py-3.5 pl-5 pr-5">
+                <td className="py-2.5 pl-3 pr-3">
                   <button
                     onClick={() => remove(acc.id)}
                     disabled={!!deleting[acc.id]}

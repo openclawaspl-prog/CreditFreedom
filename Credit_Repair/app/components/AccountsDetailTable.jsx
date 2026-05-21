@@ -449,6 +449,22 @@ function optionLabel(options, id) {
   return match ? match.label : '';
 }
 
+function sortOptionsAsc(options) {
+  return [...(options || [])].sort((a, b) =>
+    dtStr(a && a.label).localeCompare(dtStr(b && b.label), undefined, { sensitivity: 'base' })
+  );
+}
+
+function upsertSortedOption(options, option) {
+  const existing = options || [];
+  const optionId = String(option && option.id);
+  const optionLabelText = dtStr(option && option.label).trim().toLowerCase();
+  const hasOption = existing.some(opt =>
+    String(opt.id) === optionId || dtStr(opt.label).trim().toLowerCase() === optionLabelText
+  );
+  return sortOptionsAsc(hasOption ? existing : [...existing, option]);
+}
+
 function masterInfoTypeValue(row) {
   return dtStr(
     getRowValue(row, 'Type_of_information') ||
@@ -577,6 +593,265 @@ async function fetchMasterOptions(typeName = 'Account') {
     instructions,
   });
   return { reasons, instructions };
+}
+
+function accountBulkBureau(value) {
+  const normalized = dtStr(value).trim().toLowerCase().replace(/[\s_-]+/g, '');
+  if (normalized === 'equifax') return 'Equifax';
+  if (normalized === 'transunion') return 'TransUnion';
+  if (normalized === 'experian') return 'Experian';
+  return '';
+}
+
+function BulkSelectDropdown({ label, placeholder, options, value, disabled, onChange }) {
+  const [open, setOpen] = useDtState(false);
+  const [menuStyle, setMenuStyle] = useDtState(null);
+  const buttonRef = React.useRef(null);
+  const sortedOptions = sortOptionsAsc(options);
+  const selectedLabel = optionLabel(sortedOptions, value);
+
+  function buildMenuStyle() {
+    if (!buttonRef.current || !buttonRef.current.getBoundingClientRect) return null;
+    const rect = buttonRef.current.getBoundingClientRect();
+    const pad = 8;
+    const maxHeight = 220;
+    let top = rect.bottom + 6;
+
+    if (top + maxHeight > window.innerHeight - pad) {
+      top = Math.max(pad, rect.top - maxHeight - 6);
+    }
+
+    return {
+      position: 'fixed',
+      top,
+      left: Math.max(pad, rect.left),
+      width: Math.max(220, rect.width),
+      maxHeight,
+      zIndex: 2147483647,
+    };
+  }
+
+  function toggleMenu() {
+    if (disabled) return;
+    setMenuStyle(buildMenuStyle());
+    setOpen(prev => !prev);
+  }
+
+  useDtEffect(() => {
+    if (!open) return;
+    function closeMenu(event) {
+      if (buttonRef.current && buttonRef.current.contains(event.target)) return;
+      if (event.target && event.target.closest && event.target.closest('[data-bulk-dropdown-menu]')) return;
+      setOpen(false);
+    }
+    function placeMenu() {
+      setMenuStyle(buildMenuStyle());
+    }
+
+    document.addEventListener('mousedown', closeMenu);
+    window.addEventListener('resize', placeMenu);
+    window.addEventListener('scroll', placeMenu, true);
+    return () => {
+      document.removeEventListener('mousedown', closeMenu);
+      window.removeEventListener('resize', placeMenu);
+      window.removeEventListener('scroll', placeMenu, true);
+    };
+  }, [open, disabled]);
+
+  const menu = open && !disabled && menuStyle ? (
+    <div
+      data-bulk-dropdown-menu
+      className="overflow-auto rounded-xl border border-gray-200 bg-white py-2 shadow-2xl"
+      style={{
+        ...menuStyle,
+        backgroundColor: '#ffffff',
+        boxShadow: '0 18px 38px rgba(15, 23, 42, 0.16)',
+      }}
+    >
+      {sortedOptions.length === 0 ? (
+        <div className="px-4 py-3 text-sm text-gray-400">No options</div>
+      ) : (
+        sortedOptions.map(opt => (
+          <button
+            type="button"
+            key={opt.id}
+            onClick={() => {
+              onChange(opt.id);
+              setOpen(false);
+            }}
+            className={`w-full px-4 py-2.5 text-left text-sm leading-5 hover:bg-gray-50 ${String(opt.id) === String(value) ? 'bg-blue-50 text-blue-700' : 'text-gray-700'}`}
+          >
+            {opt.label}
+          </button>
+        ))
+      )}
+    </div>
+  ) : null;
+
+  return (
+    <div className="flex min-w-0 items-center gap-2 text-sm font-bold text-gray-900">
+      <span className="shrink-0">{label}:</span>
+      <div className="relative min-w-0 flex-1">
+        <button
+          ref={buttonRef}
+          type="button"
+          disabled={disabled}
+          onClick={toggleMenu}
+          className="flex w-full items-center justify-between rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-left text-sm font-semibold text-slate-800 shadow-sm transition hover:border-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <span className={selectedLabel ? 'truncate text-slate-800' : 'truncate font-normal text-gray-400'}>
+            {selectedLabel || placeholder}
+          </span>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            className={`ml-3 shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`}
+          >
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </button>
+
+        {menu && typeof ReactDOM !== 'undefined' && ReactDOM.createPortal
+          ? ReactDOM.createPortal(menu, document.body)
+          : menu}
+      </div>
+    </div>
+  );
+}
+
+function AccountBulkControls({
+  accounts,
+  selectedIds,
+  onToggleAll,
+  onToggleBureau,
+  reasonOptions,
+  instructionOptions,
+  onBulkApply,
+  onCreateMasterOption,
+  busy,
+}) {
+  const [showCustom, setShowCustom] = useDtState(false);
+  const [customReason, setCustomReason] = useDtState('');
+  const [customInstruction, setCustomInstruction] = useDtState('');
+  const [selectedReason, setSelectedReason] = useDtState('');
+  const [selectedInstruction, setSelectedInstruction] = useDtState('');
+
+  const activeAccounts = accounts || [];
+  const allChecked = activeAccounts.length > 0 && activeAccounts.every(row => selectedIds.has(row.id));
+
+  useDtEffect(() => {
+    if (selectedIds.size !== 0) return;
+    setSelectedReason('');
+    setSelectedInstruction('');
+  }, [selectedIds.size]);
+
+  function bureauRows(name) {
+    return activeAccounts.filter(row => accountBulkBureau(row[F.Creditor]) === name);
+  }
+
+  function bureauChecked(name) {
+    const rows = bureauRows(name);
+    return rows.length > 0 && rows.every(row => selectedIds.has(row.id));
+  }
+
+  function onCustomKeyDown(event, type) {
+    if (event.key !== 'Enter' || event.shiftKey) return;
+    event.preventDefault();
+
+    const value = type === 'Reason' ? customReason.trim() : customInstruction.trim();
+    if (!value || busy) return;
+
+    onCreateMasterOption(type, value).then((created) => {
+      if (!created) return;
+      if (type === 'Reason') setCustomReason('');
+      if (type === 'Instruction') setCustomInstruction('');
+    });
+  }
+
+  return (
+    <div className="cf-glass relative rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm" style={{ zIndex: 50, overflow: 'visible' }}>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+        <label className="inline-flex items-center gap-2 text-sm font-semibold text-gray-800">
+          <input
+            type="checkbox"
+            checked={allChecked}
+            onChange={(event) => onToggleAll(event.target.checked)}
+            className="h-4 w-4 rounded border-gray-300"
+          />
+          Select All Account
+        </label>
+        {['Equifax', 'TransUnion', 'Experian'].map((bureau) => (
+          <label key={bureau} className="inline-flex items-center gap-2 text-sm font-semibold text-gray-800">
+            <input
+              type="checkbox"
+              checked={bureauChecked(bureau)}
+              onChange={(event) => onToggleBureau(bureau, event.target.checked)}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            Select All {bureau} Account
+          </label>
+        ))}
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <BulkSelectDropdown
+          label="Reason"
+          placeholder="Select reason"
+          options={reasonOptions}
+          value={selectedReason}
+          disabled={busy || selectedIds.size === 0}
+          onChange={(optionId) => {
+            setSelectedReason(optionId);
+            onBulkApply(F.reason, optionId);
+          }}
+        />
+        <BulkSelectDropdown
+          label="Instruction"
+          placeholder="Select instruction"
+          options={instructionOptions}
+          value={selectedInstruction}
+          disabled={busy || selectedIds.size === 0}
+          onChange={(optionId) => {
+            setSelectedInstruction(optionId);
+            onBulkApply(F.instruction, optionId);
+          }}
+        />
+      </div>
+
+      <label className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-gray-800">
+        <input
+          type="checkbox"
+          checked={showCustom}
+          onChange={(event) => setShowCustom(event.target.checked)}
+          className="h-4 w-4 rounded border-gray-300"
+        />
+        Add Custom Reason/Instruction
+      </label>
+
+      {showCustom && (
+        <div className="mt-2 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <textarea
+            value={customReason}
+            onChange={(event) => setCustomReason(event.target.value)}
+            onKeyDown={(event) => onCustomKeyDown(event, 'Reason')}
+            placeholder="Add Custom Reason"
+            className="min-h-[62px] resize-y rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-300"
+          />
+          <textarea
+            value={customInstruction}
+            onChange={(event) => setCustomInstruction(event.target.value)}
+            onKeyDown={(event) => onCustomKeyDown(event, 'Instruction')}
+            placeholder="Add Custom Instruction"
+            className="min-h-[62px] resize-y rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-300"
+          />
+        </div>
+      )}
+    </div>
+  );
 }
 
 /* Red-X badge for Negative, plain text otherwise */
@@ -790,8 +1065,10 @@ function MoveModal({ currentKey, onMove, onClose }) {
 }
 
 /* One section card */
-function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions, instructionOptions, dropdownOpen, setDropdownOpen, readOnly = false }) {
-  const [sel, setSel] = useDtState(new Set());
+function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions, instructionOptions, dropdownOpen, setDropdownOpen, readOnly = false, selectedIds = null, onSelectionChange = null }) {
+  const [localSel, setLocalSel] = useDtState(new Set());
+  const isControlledSelection = selectedIds && onSelectionChange;
+  const sel = isControlledSelection ? selectedIds : localSel;
   const open = dropdownOpen || { sectionKey: null, id: null, field: null, style: null };
   const setOpen = setDropdownOpen;
   const [moveRowId, setMoveRowId] = useDtState(null);
@@ -807,13 +1084,13 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
 
   /* re-sync selection when rows change (e.g. after refresh) */
   useDtEffect(() => {
-    setSel(new Set());
+    if (!isControlledSelection) setLocalSel(new Set());
     setBulkMoveOpen(false);
     setMoveMenuOpen(false);
     setMoveRowId(null);
     setMoveMenuStyle(null);
     setExpandedRemarks(new Set());
-  }, [rows]);
+  }, [rows, isControlledSelection]);
 
   useDtEffect(() => {
     if (!open.id || open.sectionKey !== section.key) return;
@@ -883,15 +1160,31 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
     setMoveMenuStyle(null);
   }, [sel.size]);
 
+  function setSelection(updater) {
+    if (isControlledSelection) {
+      onSelectionChange(updater);
+    } else {
+      setLocalSel(updater);
+    }
+  }
+
+  const selectedSectionIds = rows.filter(r => sel.has(r.id)).map(r => r.id);
   const allChecked = !readOnly && rows.length > 0 && rows.every(r => sel.has(r.id));
 
   function toggleAll() {
     if (readOnly) return;
-    setSel(allChecked ? new Set() : new Set(rows.map(r => r.id)));
+    setSelection(prev => {
+      const next = new Set(prev);
+      rows.forEach(r => {
+        if (allChecked) next.delete(r.id);
+        else next.add(r.id);
+      });
+      return next;
+    });
   }
   function toggleRow(id) {
     if (readOnly) return;
-    setSel(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+    setSelection(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
   }
 
   function openMoveForRow(id, triggerEl) {
@@ -1024,13 +1317,22 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
   async function handleDelete(ids) {
     setBusy(true);
     await onDelete(ids);
-    setSel(new Set());
+    setSelection(prev => {
+      const next = new Set(prev);
+      ids.forEach(id => next.delete(id));
+      return next;
+    });
     setBusy(false);
   }
   async function handleMove(targetKey) {
+    const ids = selectedSectionIds;
     setBusy(true);
-    await onMove([...sel], targetKey);
-    setSel(new Set());
+    await onMove(ids, targetKey);
+    setSelection(prev => {
+      const next = new Set(prev);
+      ids.forEach(id => next.delete(id));
+      return next;
+    });
     setMoveMenuOpen(false);
     setMoveRowId(null);
     setMoveMenuStyle(null);
@@ -1046,9 +1348,9 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
     setBusy(false);
   }
 
-  const hasSelection = !readOnly && sel.size > 0;
+  const hasSelection = !readOnly && selectedSectionIds.length > 0;
   const moveOptions = DT_SECTIONS.filter(s => s.key !== section.key);
-  const firstSelectedId = sel.size ? Array.from(sel)[0] : null;
+  const firstSelectedId = selectedSectionIds.length ? selectedSectionIds[0] : null;
 
 
   function renderDropdownUnused(row, field, options) {
@@ -1129,7 +1431,8 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
 
   function renderDropdown(row, field, options) {
     const selectedId = lookupId(row[field]);
-    let selectedLabel = optionLabel(options, selectedId) || dtStr(row[field]) || 'Select';
+    const sortedOptions = sortOptionsAsc(options);
+    let selectedLabel = optionLabel(sortedOptions, selectedId) || dtStr(row[field]) || 'Select';
     const rowKey = dropdownRowKey(row);
     const isOpen = open.sectionKey === section.key && open.id === rowKey && open.field === field;
 
@@ -1154,10 +1457,10 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
         }}
       >
         <div className="max-h-56 overflow-y-auto py-1">
-          {options.length === 0 ? (
+          {sortedOptions.length === 0 ? (
             <div className="px-3 py-2 text-xs text-gray-400">No options</div>
           ) : (
-            options.map(opt => (
+            sortedOptions.map(opt => (
               <button
                 type="button"
                 key={opt.id}
@@ -1385,7 +1688,7 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
               </button>
               <button
                 disabled={busy}
-                onClick={() => handleDelete([...sel])}
+                onClick={() => handleDelete(selectedSectionIds)}
                 className="flex items-center gap-1.5 text-xs font-semibold text-red-500 hover:text-red-700 disabled:opacity-40"
               >
                 <IcTrash /> Delete
@@ -1436,7 +1739,7 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
               ) : null}
             </div>
           )}
-          <span className="ml-auto text-xs text-gray-500">{sel.size} selected</span>
+          <span className="ml-auto text-xs text-gray-500">{selectedSectionIds.length} selected</span>
         </div>
       )}
 
@@ -2211,7 +2514,8 @@ function CollectionTableSection({
 
   function renderDropdown(row, field, options) {
     const selectedId = lookupId(getRowValue(row, field));
-    const selectedLabel = optionLabel(options, selectedId) || dtStr(getRowValue(row, field)) || 'Select';
+    const sortedOptions = sortOptionsAsc(options);
+    const selectedLabel = optionLabel(sortedOptions, selectedId) || dtStr(getRowValue(row, field)) || 'Select';
     const key = rowKey(row);
     const isOpen = open.sectionKey === section.key && open.id === key && open.field === field;
 
@@ -2229,10 +2533,10 @@ function CollectionTableSection({
         }}
       >
         <div className="max-h-56 overflow-y-auto py-1">
-          {options.length === 0 ? (
+          {sortedOptions.length === 0 ? (
             <div className="px-3 py-2 text-xs text-gray-400">No options</div>
           ) : (
-            options.map(opt => (
+            sortedOptions.map(opt => (
               <button
                 type="button"
                 key={opt.id}
@@ -2574,7 +2878,7 @@ function CollectionTableSection({
   );
 }
 
-function AccountsDetailTable({ contactId, accounts: propAccounts, entityName }) {
+function AccountsDetailTable({ contactId, accounts: propAccounts, entityName, bulkControlsTargetId }) {
   const [accounts, setAccounts] = useDtState(propAccounts || []);
   const [deletedAccounts, setDeletedAccounts] = useDtState([]);
   const [inquiryTables, setInquiryTables] = useDtState({ new: [], inquiry: [], started: [] });
@@ -2589,12 +2893,18 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName }) 
   const [collectionInstructionOptions, setCollectionInstructionOptions] = useDtState([]);
   const [dropdownOpen, setDropdownOpen] = useDtState({ sectionKey: null, id: null, field: null, style: null });
   const [collectionDropdownOpen, setCollectionDropdownOpen] = useDtState({ sectionKey: null, id: null, field: null, style: null });
+  const [selectedAccountIds, setSelectedAccountIds] = useDtState(new Set());
+  const [bulkBusy, setBulkBusy] = useDtState(false);
 
   useDtEffect(() => {
     const active = (propAccounts || []).filter(r => !isDisplayDeleted(r));
     const deleted = (propAccounts || []).filter(isDisplayDeleted);
     setAccounts(active);
     setDeletedAccounts(deleted);
+    setSelectedAccountIds(prev => {
+      const activeIds = new Set(active.map(row => row.id));
+      return new Set(Array.from(prev).filter(id => activeIds.has(id)));
+    });
     console.log('[CF] Client_Account propAccounts:', propAccounts);
   }, [propAccounts]);
 
@@ -2674,10 +2984,10 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName }) 
         fetchMasterOptions('Collection'),
       ]);
       if (!alive) return;
-      setReasonOptions(reasons);
-      setInstructionOptions(instructions);
-      setCollectionReasonOptions(collectionReasons);
-      setCollectionInstructionOptions(collectionInstructions);
+      setReasonOptions(sortOptionsAsc(reasons));
+      setInstructionOptions(sortOptionsAsc(instructions));
+      setCollectionReasonOptions(sortOptionsAsc(collectionReasons));
+      setCollectionInstructionOptions(sortOptionsAsc(collectionInstructions));
       console.log('[CF] Reason options:', reasons);
       console.log('[CF] Reason option labels:', reasons.map(r => r.label));
       console.log('[CF] Instruction options:', instructions);
@@ -2886,6 +3196,93 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName }) 
     } catch (e) { console.warn('save error', e); }
   }
 
+  function toggleBulkAll(checked) {
+    setSelectedAccountIds(checked ? new Set(accounts.map(row => row.id)) : new Set());
+  }
+
+  function toggleBulkBureau(bureau, checked) {
+    const ids = accounts
+      .filter(row => accountBulkBureau(row[F.Creditor]) === bureau)
+      .map(row => row.id);
+
+    setSelectedAccountIds(prev => {
+      const next = new Set(prev);
+      ids.forEach(id => {
+        if (checked) next.add(id);
+        else next.delete(id);
+      });
+      return next;
+    });
+  }
+
+  async function handleBulkApply(field, optionId) {
+    const ids = Array.from(selectedAccountIds);
+    if (!ids.length || !optionId || bulkBusy) return;
+    const idSet = new Set(ids);
+
+    setBulkBusy(true);
+    try {
+      await Promise.all(ids.map(id =>
+        ZOHO.CRM.API.updateRecord({
+          Entity: 'Client_Account',
+          RecordID: id,
+          APIData: { id, [field]: { id: optionId } },
+        })
+      ));
+
+      const label = field === F.reason
+        ? optionLabel(reasonOptions, optionId)
+        : optionLabel(instructionOptions, optionId);
+
+      setAccounts(prev => prev.map(row => {
+        if (!idSet.has(row.id)) return row;
+        return {
+          ...row,
+          [field]: { id: optionId, name: label },
+        };
+      }));
+    } catch (e) {
+      console.warn('bulk save error', e);
+    } finally {
+      setBulkBusy(false);
+      window.OverviewWidget && window.OverviewWidget.requestResize && window.OverviewWidget.requestResize();
+    }
+  }
+
+  async function handleCreateMasterOption(type, value) {
+    if (!value || bulkBusy || !window.ZOHO || !ZOHO.CRM || !ZOHO.CRM.API || !ZOHO.CRM.API.insertRecord) return null;
+    setBulkBusy(true);
+    try {
+      const resp = await ZOHO.CRM.API.insertRecord({
+        Entity: 'Master_Reason_Instruction',
+        APIData: {
+          Name: value,
+          Type: type,
+          Type_of_information: 'Account',
+          Status_Active: true,
+        },
+        Trigger: ['workflow'],
+      });
+
+      const createdId = resp && resp.data && resp.data[0] && resp.data[0].details && resp.data[0].details.id;
+      const option = { id: createdId || value, label: value };
+
+      if (type === 'Reason') {
+        setReasonOptions(prev => upsertSortedOption(prev, option));
+      } else {
+        setInstructionOptions(prev => upsertSortedOption(prev, option));
+      }
+
+      return option;
+    } catch (e) {
+      console.warn('create master option error', e);
+      return null;
+    } finally {
+      setBulkBusy(false);
+      window.OverviewWidget && window.OverviewWidget.requestResize && window.OverviewWidget.requestResize();
+    }
+  }
+
   /* Group by block_type */
   const grouped = Object.fromEntries(DT_SECTIONS.map(s => [s.key, []]));
   accounts.forEach(acc => {
@@ -2902,9 +3299,28 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName }) 
   );
   const groupedCollections = groupCollectionRows(collectionRows);
   const visibleCollectionSections = COLLECTION_SECTIONS.filter(section => (groupedCollections[section.key] || []).length > 0);
+  const bulkControls = (
+    <AccountBulkControls
+      accounts={accounts}
+      selectedIds={selectedAccountIds}
+      onToggleAll={toggleBulkAll}
+      onToggleBureau={toggleBulkBureau}
+      reasonOptions={reasonOptions}
+      instructionOptions={instructionOptions}
+      onBulkApply={handleBulkApply}
+      onCreateMasterOption={handleCreateMasterOption}
+      busy={bulkBusy}
+    />
+  );
+  const bulkControlsTarget = bulkControlsTargetId && typeof document !== 'undefined'
+    ? document.getElementById(bulkControlsTargetId)
+    : null;
 
   return (
     <div className="space-y-4">
+      {bulkControlsTarget && typeof ReactDOM !== 'undefined' && ReactDOM.createPortal
+        ? ReactDOM.createPortal(bulkControls, bulkControlsTarget)
+        : bulkControls}
       {DT_SECTIONS.map(section => (
         <SectionCard
           key={section.key}
@@ -2917,6 +3333,8 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName }) 
           instructionOptions={instructionOptions}
           dropdownOpen={dropdownOpen}
           setDropdownOpen={setDropdownOpen}
+          selectedIds={selectedAccountIds}
+          onSelectionChange={setSelectedAccountIds}
         />
       ))}
       <SectionCard

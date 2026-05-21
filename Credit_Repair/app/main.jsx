@@ -420,19 +420,15 @@ const DisputeWidget = () => {
 
   return (
     <div className="space-y-4">
-      <ClientHeaderCard
-        name={c.Full_Name}
-        email={c.Email}
-        referredBy={c.Referred_By}
-        status={c.Client_Status}
-      >
+      <div className="flex justify-end">
         <ActionButtonsBar contactId={contactId} entity={entityName} />
-      </ClientHeaderCard>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 items-start" style={{ gridTemplateColumns: '1fr' }}>
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-start">
           <div className="lg:col-span-3">
             <CreditScoresCard record={c} contactId={contactId} />
+            <div id="account-bulk-controls-slot" className="mt-4" />
           </div>
           <div className="lg:col-span-2">
             <DisputeStatusTable counts={counts} />
@@ -444,6 +440,7 @@ const DisputeWidget = () => {
         contactId={contactId}
         accounts={accounts}
         entityName={entityName}
+        bulkControlsTargetId="account-bulk-controls-slot"
       />
     </div>
   );

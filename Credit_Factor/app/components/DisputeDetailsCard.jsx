@@ -7,7 +7,7 @@ function DisputeDetailsCard({
   onSubmit,
 }) {
   return (
-    <section className="bg-white rounded-xl border border-gray-200 px-6 py-5">
+    <section className="relative z-10 overflow-visible bg-white rounded-xl border border-gray-200 px-6 py-5">
       <h2 className="text-sm font-semibold text-gray-800 mb-4">Dispute Details</h2>
       <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-4 items-end">
         <div>

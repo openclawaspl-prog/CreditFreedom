@@ -1,10 +1,24 @@
 const { useEffect: useCreditFactorSharedEffect, useRef: useCreditFactorSharedRef, useState: useCreditFactorSharedState } = React;
 
-function CreditFactorDropdown({ label, options, value, onChange, placeholder = 'Select' }) {
+function CreditFactorDropdown({ label, options, value, onChange, placeholder = 'Select', sortOptions = true }) {
   const [open, setOpen] = useCreditFactorSharedState(false);
+  const [menuStyle, setMenuStyle] = useCreditFactorSharedState(null);
   const wrapperRef = useCreditFactorSharedRef(null);
-  const sortedOptions = [...options].sort((a, b) => String(a).localeCompare(String(b)));
+  const menuRef = useCreditFactorSharedRef(null);
+  const normalizedOptions = (options || []).map((option) => {
+    if (option && typeof option === 'object') {
+      return {
+        label: option.label ?? option.value ?? '',
+        value: option.value ?? option.label ?? '',
+      };
+    }
+    return { label: option, value: option };
+  });
+  const sortedOptions = sortOptions
+    ? [...normalizedOptions].sort((a, b) => String(a.label).localeCompare(String(b.label)))
+    : normalizedOptions;
   const dropdownSpace = Math.min(options.length * 42 + 24, 240);
+  const activeOption = sortedOptions.find((option) => String(option.value) === String(value));
 
   function requestDropdownResize() {
     setTimeout(() => window.CreditFactorWidget?.requestResize?.(), 0);
@@ -13,13 +27,41 @@ function CreditFactorDropdown({ label, options, value, onChange, placeholder = '
 
   useCreditFactorSharedEffect(() => {
     function handleClickOutside(event) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target) && menuRef.current && !menuRef.current.contains(event.target)) {
         setOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useCreditFactorSharedEffect(() => {
+    if (!open || !wrapperRef.current) {
+      setMenuStyle(null);
+      return undefined;
+    }
+
+    function updateMenuPosition() {
+      if (!wrapperRef.current) return;
+      const rect = wrapperRef.current.getBoundingClientRect();
+      setMenuStyle({
+        position: 'fixed',
+        top: `${rect.bottom + 8}px`,
+        left: `${rect.left}px`,
+        width: `${rect.width}px`,
+        zIndex: 2147483647,
+      });
+    }
+
+    updateMenuPosition();
+    window.addEventListener('resize', updateMenuPosition);
+    window.addEventListener('scroll', updateMenuPosition, true);
+
+    return () => {
+      window.removeEventListener('resize', updateMenuPosition);
+      window.removeEventListener('scroll', updateMenuPosition, true);
+    };
+  }, [open]);
 
   useCreditFactorSharedEffect(() => {
     window.CreditFactorWidget?.setDropdownSpace?.(open ? dropdownSpace : 0);
@@ -32,7 +74,7 @@ function CreditFactorDropdown({ label, options, value, onChange, placeholder = '
   }, [open]);
 
   return (
-    <div className={`relative ${open ? 'z-50' : 'z-0'}`} ref={wrapperRef}>
+    <div className={`relative z-[50] ${open ? 'z-[2147483647]' : ''}`} ref={wrapperRef}>
       {label && <label className="block text-xs font-medium text-gray-600 mb-2">{label}</label>}
       <button
         type="button"
@@ -40,7 +82,7 @@ function CreditFactorDropdown({ label, options, value, onChange, placeholder = '
         onClick={() => setOpen((prev) => !prev)}
         className="w-full h-10 rounded-lg border border-gray-200 px-3 text-sm bg-white flex items-center justify-between text-left"
       >
-        <span className={value ? 'text-gray-700' : 'text-gray-400'}>{value || placeholder}</span>
+        <span className={value ? 'text-gray-700' : 'text-gray-400'}>{activeOption ? activeOption.label : value || placeholder}</span>
         <svg
           className={`w-4 h-4 text-gray-500 transition-transform ${open ? 'rotate-180' : ''}`}
           viewBox="0 0 20 20"
@@ -51,24 +93,31 @@ function CreditFactorDropdown({ label, options, value, onChange, placeholder = '
           <polyline points="6 8 10 12 14 8" />
         </svg>
       </button>
-      {open && (
-        <div className="absolute z-50 mt-2 w-full rounded-lg border border-gray-200 bg-white shadow-lg max-h-56 overflow-auto">
+      {open && menuStyle && ReactDOM.createPortal(
+        <div
+          ref={menuRef}
+          className="rounded-lg border border-gray-200 bg-white shadow-lg max-h-56 overflow-auto"
+          style={menuStyle}
+        >
           {sortedOptions.map((opt) => (
             <button
-              key={opt}
+              key={String(opt.value)}
               type="button"
-              onClick={() => {
-                onChange(opt);
+              onMouseDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onChange(opt.value);
                 setOpen(false);
               }}
               className={`w-full px-3 py-2 text-sm text-left hover:bg-indigo-50 ${
-                opt === value ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700'
+                String(opt.value) === String(value) ? 'bg-indigo-50 text-indigo-700' : 'text-gray-700'
               }`}
             >
-              {opt}
+              {opt.label}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -294,7 +294,7 @@ function BureauScoreLineChart() {
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4 h-full flex flex-col">
       <div className="mb-3 flex items-start justify-between gap-3">
-        <h2 className="text-base font-bold text-gray-900">Bureau Score Trend</h2>
+        <h2 className="text-base font-bold text-gray-900">Bureau Score Line Chart</h2>
         <div className="flex flex-wrap items-center justify-end gap-4">
           {loading && <span className="text-xs text-gray-400">Loading...</span>}
           {!loading && error && <span className="text-xs text-red-500">{error}</span>}

@@ -200,8 +200,8 @@ function BureauCol({ name, score, max, gaugeId, logoSrc }) {
         />
       </div>
 
-      <div className="flex h-[135px] w-full items-center justify-center">
-        <div className="h-[122px] w-[185px] max-w-full">
+      <div className="flex h-[118px] w-full items-center justify-center">
+        <div className="h-[108px] w-[164px] max-w-full">
           <SpeedometerGauge value={score} max={max} gradientId={gaugeId} />
         </div>
       </div>
@@ -243,14 +243,14 @@ function CreditBureauReportsCard() {
   ];
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm w-full min-h-[240px] px-4 py-3">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm w-full min-h-[205px] px-4 py-3">
       {(loading || error) && (
         <div className="mb-3 flex justify-end">
           {loading && <span className="text-xs text-gray-400">Loading...</span>}
           {!loading && error && <span className="text-xs text-red-500">{error}</span>}
         </div>
       )}
-      <div className="grid min-h-[214px] grid-cols-1 content-center gap-2 sm:grid-cols-3">
+      <div className="grid min-h-[179px] grid-cols-1 content-center gap-2 sm:grid-cols-3">
         {bureaus.map((b, i) => (
           <div key={b.name} className="py-1 first:pt-0 last:pb-0 sm:flex sm:px-2 sm:py-0">
             <BureauCol {...b} max={MAX_SCORE} gaugeId={`gauge-${i}`} />

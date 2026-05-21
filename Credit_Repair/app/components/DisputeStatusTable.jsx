@@ -10,14 +10,32 @@
 */
 
 const DISPUTE_ROWS = [
-  { label: 'Late Account', key: 'late' },
-  { label: 'New Account', key: 'new' },
-  { label: 'Started Account', key: 'start' },
-  { label: 'Charged Account', key: 'charged' },
-  { label: 'Closed Account', key: 'closed' },
-  { label: 'Account Change', key: 'account_change' },
-  { label: 'Removed Change', key: 'removed' },
+  { label: 'Late Account', key: 'late', textClass: 'text-rose-600' },
+  { label: 'New Account', key: 'new', textClass: 'text-sky-600' },
+  { label: 'Started Account', key: 'start', textClass: 'text-emerald-600' },
+  { label: 'Charged Account', key: 'charged', textClass: 'text-orange-600' },
+  { label: 'Closed Account', key: 'closed', textClass: 'text-slate-600' },
+  { label: 'Account Change', key: 'account_change', textClass: 'text-violet-600' },
+  { label: 'Removed Change', key: 'removed', textClass: 'text-amber-600' },
 ];
+
+const BUREAU_LOGOS = {
+  Equifax: './assets/equifax-logo.svg',
+  TransUnion: './assets/transunion-logo.svg',
+  Experian: './assets/experian-logo.svg',
+};
+
+function BureauLogoHeader({ name }) {
+  const logoClass = name === 'Experian'
+    ? 'h-7 w-auto max-w-[120px] object-contain'
+    : 'h-5 w-auto max-w-[120px] object-contain';
+
+  return (
+    <div className="flex items-center justify-center">
+      <img src={BUREAU_LOGOS[name]} alt={name} className={logoClass} />
+    </div>
+  );
+}
 
 function DisputeStatusTable({ counts }) {
   function get(bureau, key) {
@@ -35,30 +53,30 @@ function DisputeStatusTable({ counts }) {
               <th className="text-left text-xs font-semibold text-gray-500 pb-3 pr-6 whitespace-nowrap">
                 Status
               </th>
-              <th className="text-center text-xs font-semibold text-gray-700 pb-3 px-4 whitespace-nowrap">
-                Equifax
+              <th className="pb-3 px-4">
+                <BureauLogoHeader name="Equifax" />
               </th>
-              <th className="text-center text-xs font-semibold text-gray-700 pb-3 px-4 whitespace-nowrap">
-                TransUnion
+              <th className="pb-3 px-4">
+                <BureauLogoHeader name="TransUnion" />
               </th>
-              <th className="text-center text-xs font-semibold text-gray-700 pb-3 px-4 whitespace-nowrap">
-                Experian
+              <th className="pb-3 px-4">
+                <BureauLogoHeader name="Experian" />
               </th>
             </tr>
           </thead>
           <tbody>
             {DISPUTE_ROWS.map(row => (
               <tr key={row.key} className="border-b border-gray-50 last:border-0">
-                <td className="py-3 pr-6 text-sm text-gray-700 whitespace-nowrap">
+                <td className={`py-3 pl-3 pr-6 text-sm font-semibold whitespace-nowrap ${row.textClass}`}>
                   {row.label}
                 </td>
-                <td className="py-3 px-4 text-center text-sm text-gray-600">
+                <td className={`py-3 px-4 text-center text-sm font-semibold ${row.textClass}`}>
                   {get('Equifax', row.key)}
                 </td>
-                <td className="py-3 px-4 text-center text-sm text-gray-600">
+                <td className={`py-3 px-4 text-center text-sm font-semibold ${row.textClass}`}>
                   {get('TransUnion', row.key)}
                 </td>
-                <td className="py-3 px-4 text-center text-sm text-gray-600">
+                <td className={`py-3 px-4 text-center text-sm font-semibold ${row.textClass}`}>
                   {get('Experian', row.key)}
                 </td>
               </tr>

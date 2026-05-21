@@ -114,14 +114,14 @@ function AccountsCountChart() {
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4">
-      <h2 className="text-base font-bold text-gray-900 mb-1">Account's Count</h2>
+      <h2 className="text-lg font-bold text-gray-900 mb-2">Account's Count</h2>
 
       {/* Bureau legend */}
       <div className="flex items-center gap-4 mb-3">
         {BUREAUS.map(name => (
           <div key={name} className="flex items-center gap-1.5">
             <span style={{ width:8, height:8, borderRadius:'50%', background:BUREAU_COLORS[name], display:'inline-block' }} />
-            <span className="text-[11px] text-gray-500">{name}</span>
+            <span className="text-sm text-gray-500">{name}</span>
           </div>
         ))}
       </div>
@@ -138,7 +138,7 @@ function AccountsCountChart() {
             <g key={tick}>
               <line x1={PL} y1={y} x2={CW - PR} y2={y}
                 stroke={tick === 0 ? '#e5e7eb' : '#f3f4f6'} strokeWidth="1" />
-              <text x={PL - 5} y={y + 4} textAnchor="end" fontSize="13" fill="black">
+              <text x={PL - 5} y={y + 4} textAnchor="end" fontSize="15" fill="black">
                 {tick}
               </text>
             </g>
@@ -174,7 +174,7 @@ function AccountsCountChart() {
 
               {/* Value label on top */}
               {total > 0 && (
-                <text x={cx} y={bY - 4} textAnchor="middle" fontSize="12" fontWeight="500" fill="#374151">
+                <text x={cx} y={bY - 4} textAnchor="middle" fontSize="15" fontWeight="600" fill="#374151">
                   {total}
                 </text>
               )}
@@ -183,7 +183,7 @@ function AccountsCountChart() {
               <text
                 x={cx} y={CH - 24}
                 textAnchor="middle"
-                fontSize="13" fill={isHov ? BUREAU_HOVER_COLORS[bureau] : 'black'}
+                fontSize="15" fill={isHov ? BUREAU_HOVER_COLORS[bureau] : 'black'}
                 fontWeight={isHov ? '600' : '400'}
               >
                 {LABELS[bureau]}

@@ -174,7 +174,7 @@ function AlertcontrolPanelCard() {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm w-full lg:w-4/5 px-5 pt-5 pb-4">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm w-full px-5 pt-5 pb-4">
       <h2 className="text-base font-bold text-gray-900 mb-4">Alert Control Panel</h2>
 
       {error && (

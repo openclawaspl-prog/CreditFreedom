@@ -10,7 +10,7 @@ function DonutRing({ value, total, color }) {
   const offset = circ * (1 - value / total);
 
   return (
-    <svg viewBox="0 0 180 180" className="w-full max-w-[150px] mx-auto block">
+    <svg viewBox="0 0 180 180" className="w-full max-w-[118px] mx-auto block">
       {/* Track */}
       <circle cx={cx} cy={cy} r={r} fill="none" stroke="#e5e7eb" strokeWidth="12" />
       {/* Fill */}
@@ -34,14 +34,14 @@ function DonutRing({ value, total, color }) {
 
 function TotalBalanceCard() {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-4 h-[220px] flex flex-col">
-      <div className="flex items-center justify-between gap-3 mb-2">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-4 h-[160px] flex items-stretch gap-6">
+      <div className="flex w-[210px] flex-col items-start gap-2">
         <h2 className="text-base font-bold text-gray-900">Total Balance</h2>
         <button className="text-xs font-semibold text-gray-600 border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors whitespace-nowrap">
           Start Monthly Program
         </button>
       </div>
-      <div className="flex-1 flex items-center justify-center">
+      <div className="flex flex-1 items-center justify-center">
         <DonutRing value={150} total={1000} color="#818cf8" />
       </div>
     </div>

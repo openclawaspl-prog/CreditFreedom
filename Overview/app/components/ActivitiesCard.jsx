@@ -17,7 +17,7 @@ function ActivitiesCard() {
   const visible = MOCK_ACTIVITIES.slice(0, MAX_VISIBLE);
 
   return (
-    <div className="min-h-[365px] bg-white rounded-xl border border-gray-200 shadow-sm px-4 pt-4 pb-3">
+    <div className="min-h-[280px] bg-white rounded-xl border border-gray-200 shadow-sm px-4 pt-4 pb-3">
       <h2 className="text-base font-bold text-gray-900 mb-3">Activities</h2>
 
       <div className="space-y-3">

@@ -124,17 +124,17 @@ function SpeedometerGauge({ value, min = 300, max, gradientId }) {
     <svg viewBox="0 0 240 170" className="block h-full w-full" aria-hidden="true">
       <defs>
         <linearGradient id={arcGradientId} x1="22" y1="145" x2="218" y2="145" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#e00000" />
-          <stop offset="25%" stopColor="#ff3012" />
-          <stop offset="43%" stopColor="#ff8a18" />
-          <stop offset="58%" stopColor="#ffd800" />
-          <stop offset="70%" stopColor="#fff35d" />
-          <stop offset="84%" stopColor="#35d85f" />
-          <stop offset="100%" stopColor="#079b45" />
+          <stop offset="0%" stopColor="rgb(224, 0, 0)" stopOpacity="0.70" />
+          <stop offset="25%" stopColor="rgb(255, 50, 18)" stopOpacity="0.70" />
+          <stop offset="43%" stopColor="rgb(255, 139, 24)" stopOpacity="0.70" />
+          <stop offset="58%" stopColor="rgb(255, 217, 0)" stopOpacity="0.70" />
+          <stop offset="70%" stopColor="rgb(255, 244, 93)" stopOpacity="0.70" />
+          <stop offset="84%" stopColor="rgb(53, 216, 94)" stopOpacity="0.70" />
+          <stop offset="100%" stopColor="rgb(7, 155, 69)" stopOpacity="0.70" />
         </linearGradient>
         <linearGradient id={scoreFillId} x1="63" y1="89" x2="177" y2="157" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor={activeScoreStyle.from} />
-          <stop offset="100%" stopColor={activeScoreStyle.to} />
+          <stop offset="0%" stopColor={activeScoreStyle.from} stopOpacity="0.78" />
+          <stop offset="100%" stopColor={activeScoreStyle.to} stopOpacity="0.78" />
         </linearGradient>
         <linearGradient id={needleFillId} x1="76" y1="70" x2="135" y2="145" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stopColor="#64748b" />
@@ -179,7 +179,7 @@ function SpeedometerGauge({ value, min = 300, max, gradientId }) {
       />
 
       <text x={cx} y="132" textAnchor="middle">
-        <tspan fontSize="38" fontWeight="800" fill={activeScoreStyle.text}>{displayValue}</tspan>
+        <tspan fontSize="28" fontWeight="800" fill={activeScoreStyle.text}>{displayValue}</tspan>
       </text>
     </svg>
   );

@@ -30,12 +30,12 @@ function ProgramEligibilityCard() {
   }
 
   return (
-    <div className="flex min-h-[320px] w-full flex-col rounded-xl border border-gray-200 bg-white px-4 pt-5 pb-4 shadow-sm">
-      <h2 className="text-base font-bold text-gray-900 mb-4">Program Eligibility</h2>
+    <div className="flex min-h-[280px] w-full flex-col rounded-xl border border-gray-200 bg-white px-4 pt-5 pb-4 shadow-sm">
+      <h2 className="text-base font-bold text-gray-900 mb-2">Program Eligibility</h2>
 
-      <div className="flex flex-1 flex-col justify-center">
+      <div className="flex flex-1 flex-col justify-start pt-3">
         {/* Loan eligibility */}
-        <div className="grid max-w-[310px] grid-cols-[minmax(0,1fr)_122px] items-center gap-2 mb-6">
+        <div className="grid max-w-[310px] grid-cols-[minmax(0,1fr)_122px] items-center gap-2 mb-4">
           <span className="text-sm text-gray-700">Loan Eligible?</span>
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
@@ -44,8 +44,8 @@ function ProgramEligibilityCard() {
         </div>
 
         {/* Programs */}
-        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-4">Available Programs</p>
-        <div className="space-y-4">
+        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-3">Available Programs</p>
+        <div className="space-y-3">
           {PROGRAMS.map(({ key, emoji, label }) => (
             <div key={key} className="grid w-[205px] grid-cols-[minmax(0,1fr)_36px] items-end gap-2">
               <div className="flex min-w-0 items-start gap-2">

@@ -40,6 +40,10 @@ const CACHE_TTL = 30 * 60 * 1000; // 30 min
 function pickFields(r) {
   return {
     id:            r.id,
+    Salutation: r.Salutation,
+    First_Name:    r.First_Name || null,
+    Last_Name:     r.Last_Name || null,
+    Social_Security_Number: r.Social_Security_Number || null,
     Date_of_Birth: r.Date_of_Birth || null,
     Office_Phone:  r.Office_Phone  || null,
     Email:         r.Email         || null,
@@ -100,7 +104,12 @@ function fmtDateTime(str) {
 
 function mapRecord(r) {
   const assigned = r.Assigned_To;
+  const fullName = r.Salutation +" "+ [r.First_Name, r.Last_Name].filter(Boolean).join(' ').trim();
+  console.log(r);
+  
   return {
+    fullName:     fullName || '—',
+    socialSecurityNumber: r.Social_Security_Number || '—',
     dateOfBirth:  fmtDate(r.Date_of_Birth),
     assignedTo:   assigned ? (typeof assigned === 'object' ? assigned.name : assigned) : '—',
     officePhone:  r.Office_Phone || '—',
@@ -196,6 +205,8 @@ function ClientDetailsCard() {
       /* ② Background fetch */
       ZOHO.CRM.API.getRecord({ Entity: 'Contacts', RecordID: recordId })
         .then(res => {
+          console.log(res.data);
+          
           if (res.data?.[0]) {
             const fresh = res.data[0];
             /* ③ Delta check */
@@ -237,6 +248,9 @@ function ClientDetailsCard() {
   /* ── Edit actions ── */
   function startEdit() {
     setEditVals({
+      First_Name:    rawRecord.First_Name || '',
+      Last_Name:     rawRecord.Last_Name || '',
+      Social_Security_Number: rawRecord.Social_Security_Number || '',
       Date_of_Birth: rawRecord.Date_of_Birth || '',
       Office_Phone:  rawRecord.Office_Phone  || '',
       Email:         rawRecord.Email         || '',
@@ -263,6 +277,9 @@ function ClientDetailsCard() {
       Entity: 'Contacts',
       APIData: {
         id:            rawRecord.id,
+        First_Name:    vals.First_Name || null,
+        Last_Name:     vals.Last_Name || null,
+        Social_Security_Number: vals.Social_Security_Number || null,
         Date_of_Birth: vals.Date_of_Birth || null,
         Office_Phone:  vals.Office_Phone  || null,
         Email:         vals.Email         || null,
@@ -315,7 +332,10 @@ function ClientDetailsCard() {
       <div className="mt-2 divide-y divide-gray-100">
         {isEditing ? (
           <>
-            <EditRow label="Date of Birth" field="Date_of_Birth" value={editVals.Date_of_Birth} type="date"  autoFocus onChange={handleFieldChange} />
+            <EditRow label="First Name" field="First_Name" value={editVals.First_Name} autoFocus onChange={handleFieldChange} />
+            <EditRow label="Last Name" field="Last_Name" value={editVals.Last_Name} onChange={handleFieldChange} />
+            <EditRow label="SSN" field="Social_Security_Number" value={editVals.Social_Security_Number} onChange={handleFieldChange} />
+            <EditRow label="Date of Birth" field="Date_of_Birth" value={editVals.Date_of_Birth} type="date" onChange={handleFieldChange} />
             <DisplayRow label="Assigned To"   value={client.assignedTo}  bold />
             <EditRow label="Office Phone"  field="Office_Phone"  value={editVals.Office_Phone}  type="tel"   onChange={handleFieldChange} />
             <EditRow label="Primary Email" field="Email"         value={editVals.Email}          type="email" onChange={handleFieldChange} />
@@ -324,6 +344,8 @@ function ClientDetailsCard() {
           </>
         ) : (
           <>
+            <DisplayRow label="Full Name"      value={client.fullName}      bold />
+            <DisplayRow label="SSN"            value={client.socialSecurityNumber} />
             <DisplayRow label="Date of Birth"  value={client.dateOfBirth}   />
             <DisplayRow label="Assigned To"    value={client.assignedTo}    bold />
             <DisplayRow label="Office Phone"   value={client.officePhone}   />

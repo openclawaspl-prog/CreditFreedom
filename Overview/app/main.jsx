@@ -262,11 +262,10 @@ const MainWidget = () => {
         <div className="space-y-4">
           <ReferralCreditsCard />
           <AccountsCountChart />
-          <LogginCredentialsCard cardTitles={['Transunion Login']} />
+          <ActivitiesCard />
         </div>
         <div className="space-y-4">
-          <ActivitiesCard />
-          <LogginCredentialsCard cardTitles={['Equifax Login', 'Experian Monitoring Login']} />
+          <LogginCredentialsCard cardTitles={['Equifax Login', 'Transunion Login', 'Experian Monitoring Login']} />
         </div>
       </div>
 

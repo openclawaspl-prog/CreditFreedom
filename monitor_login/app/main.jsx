@@ -745,7 +745,7 @@ function App() {
               </svg>
             </span>
             <input
-              type="search"
+              type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search logins..."
@@ -848,7 +848,5 @@ function App() {
     </main>
   );
 }
- 
+
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
- 
- 

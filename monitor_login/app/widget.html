@@ -116,6 +116,12 @@
       color: rgba(100, 116, 139, 0.78);
       font-weight: 500;
     }
+
+    .search-input::-webkit-search-cancel-button,
+    .search-input::-webkit-search-decoration {
+      display: none;
+      -webkit-appearance: none;
+    }
  
     .search-clear {
       position: absolute;
@@ -415,9 +421,7 @@
  
 <body>
   <div id="root"></div>
-  <script type="text/babel" src="./main.js"></script>
+  <script type="text/babel" src="./main.jsx"></script>
 </body>
- 
+
 </html>
- 
- 

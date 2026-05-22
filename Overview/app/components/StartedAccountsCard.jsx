@@ -123,6 +123,7 @@ function StartedAccountsCard() {
   const [loading, setLoading] = useAccountsState(true);
   const [error, setError] = useAccountsState('');
   const [deleting, setDeleting] = useAccountsState({});
+  const [confirmDelete, setConfirmDelete] = useAccountsState(null);
   const MAX_VISIBLE = 4;
   const needsScroll = accounts.length > MAX_VISIBLE;
 
@@ -171,6 +172,49 @@ function StartedAccountsCard() {
         setDeleting(prev => ({ ...prev, [id]: false }));
         window.OverviewWidget.requestResize();
       });
+  }
+
+  function getConfirmPosition(event) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const viewport = window.visualViewport || {
+      width: window.innerWidth,
+      height: window.innerHeight,
+      offsetLeft: 0,
+      offsetTop: 0,
+    };
+    const modalWidth = 384;
+    const modalHeight = 180;
+    const left = viewport.offsetLeft + viewport.width / 2;
+    const top = Math.min(
+      Math.max(rect.top + rect.height / 2, modalHeight / 2 + 16),
+      viewport.offsetTop + viewport.height - modalHeight / 2 - 16
+    );
+    return {
+      left: Math.min(
+        Math.max(left, modalWidth / 2 + 16),
+        viewport.offsetLeft + viewport.width - modalWidth / 2 - 16
+      ),
+      top,
+    };
+  }
+
+  function openDeleteConfirm(account, event) {
+    if (!account || deleting[account.id]) return;
+    setConfirmDelete({
+      account,
+      position: getConfirmPosition(event),
+    });
+  }
+
+  function cancelDeleteConfirm() {
+    setConfirmDelete(null);
+  }
+
+  function confirmDeleteAccount() {
+    if (!confirmDelete) return;
+    const id = confirmDelete.account.id;
+    setConfirmDelete(null);
+    remove(id);
   }
 
   // const headers = ['Account Name', 'Type', 'Bureau', 'Balance', 'Limit', 'Status', 'Actions'];
@@ -266,7 +310,7 @@ function StartedAccountsCard() {
                 </td>
                 <td className="py-2.5 pl-3 pr-3">
                   <button
-                    onClick={() => remove(acc.id)}
+                    onClick={(event) => openDeleteConfirm(acc, event)}
                     disabled={!!deleting[acc.id]}
                     className={`text-red-400 transition-colors hover:text-red-600 ${deleting[acc.id] ? 'cursor-wait opacity-50' : ''}`}
                     title="Remove account"
@@ -279,6 +323,41 @@ function StartedAccountsCard() {
           </tbody>
         </table>
       </div>
+
+      {confirmDelete && ReactDOM.createPortal(
+        <div className="fixed inset-0 z-[2147483647] bg-slate-900/35">
+          <div
+            className="absolute w-[min(384px,calc(100vw-32px))] rounded-xl border border-gray-200 bg-white p-5 shadow-2xl"
+            style={{
+              left: `${confirmDelete.position.left}px`,
+              top: `${confirmDelete.position.top}px`,
+              transform: 'translate(-50%, -50%)',
+            }}
+          >
+            <h3 className="text-base font-bold text-gray-900">Delete account?</h3>
+            <p className="mt-2 text-sm leading-6 text-gray-600">
+              Are you sure you want to delete {confirmDelete.account.name || 'this account'}?
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={cancelDeleteConfirm}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteAccount}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

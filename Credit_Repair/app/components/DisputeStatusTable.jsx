@@ -27,11 +27,13 @@ const BUREAU_LOGOS = {
 
 function BureauLogoHeader({ name }) {
   const logoClass = name === 'Experian'
-    ? 'h-7 w-auto max-w-[120px] object-contain'
-    : 'h-5 w-auto max-w-[120px] object-contain';
+    ? 'h-7 w-auto max-w-[110px] object-contain'
+    : name === 'TransUnion'
+      ? 'h-6 w-auto max-w-[132px] object-contain'
+      : 'h-6 w-auto max-w-[112px] object-contain';
 
   return (
-    <div className="flex items-center justify-center">
+    <div className="flex min-h-8 items-center justify-center overflow-visible px-1">
       <img src={BUREAU_LOGOS[name]} alt={name} className={logoClass} />
     </div>
   );
@@ -45,21 +47,27 @@ function DisputeStatusTable({ counts }) {
   }
 
   return (
-    <div className="cf-glass bg-white rounded-xl border border-gray-200 shadow-sm px-5 pt-5 pb-2">
-      <div className="overflow-x-auto">
-        <table className="w-full">
+    <div className="cf-glass bg-white rounded-xl border border-gray-200 shadow-sm px-4 pt-5 pb-2">
+      <div className="overflow-hidden">
+        <table className="w-full table-fixed">
+          <colgroup>
+            <col className="w-[34%]" />
+            <col className="w-[22%]" />
+            <col className="w-[22%]" />
+            <col className="w-[22%]" />
+          </colgroup>
           <thead>
             <tr className="border-b border-gray-100">
-              <th className="text-left text-xs font-semibold text-gray-500 pb-3 pr-6 whitespace-nowrap">
+              <th className="pb-3 pr-3 text-left text-xs font-semibold text-gray-500">
                 Status
               </th>
-              <th className="pb-3 px-4">
+              <th className="px-2 pb-3">
                 <BureauLogoHeader name="Equifax" />
               </th>
-              <th className="pb-3 px-4">
+              <th className="px-2 pb-3">
                 <BureauLogoHeader name="TransUnion" />
               </th>
-              <th className="pb-3 px-4">
+              <th className="px-2 pb-3">
                 <BureauLogoHeader name="Experian" />
               </th>
             </tr>
@@ -67,16 +75,16 @@ function DisputeStatusTable({ counts }) {
           <tbody>
             {DISPUTE_ROWS.map(row => (
               <tr key={row.key} className="border-b border-gray-50 last:border-0">
-                <td className={`py-3 pl-3 pr-6 text-sm font-semibold whitespace-nowrap ${row.textClass}`}>
+                <td className={`py-3 pl-2 pr-3 text-sm font-semibold leading-5 ${row.textClass}`}>
                   {row.label}
                 </td>
-                <td className={`py-3 px-4 text-center text-sm font-semibold ${row.textClass}`}>
+                <td className={`px-2 py-3 text-center text-sm font-semibold ${row.textClass}`}>
                   {get('Equifax', row.key)}
                 </td>
-                <td className={`py-3 px-4 text-center text-sm font-semibold ${row.textClass}`}>
+                <td className={`px-2 py-3 text-center text-sm font-semibold ${row.textClass}`}>
                   {get('TransUnion', row.key)}
                 </td>
-                <td className={`py-3 px-4 text-center text-sm font-semibold ${row.textClass}`}>
+                <td className={`px-2 py-3 text-center text-sm font-semibold ${row.textClass}`}>
                   {get('Experian', row.key)}
                 </td>
               </tr>

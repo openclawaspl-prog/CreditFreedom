@@ -12,12 +12,12 @@ function DisputeDetailsCard({
 }) {
   const rows = Array.isArray(records) ? records : [];
   const columns = [
-    { key: 'File_Id1', label: 'File ID', className: 'w-[150px] min-w-[150px] whitespace-nowrap' },
-    { key: 'Account_Name', label: 'Account Name', className: 'w-[190px] min-w-[190px] whitespace-normal' },
-    { key: 'Account_Number', label: 'Account Number', className: 'w-[190px] min-w-[190px] whitespace-nowrap' },
-    { key: 'Report_Created_On', label: 'Report Created On', className: 'w-[135px] min-w-[135px] whitespace-normal' },
-    { key: 'Date_Opened', label: 'Date Opened', className: 'w-[130px] min-w-[130px] whitespace-normal' },
-    { key: 'Result_Text', label: 'Result Text', className: 'min-w-[520px] whitespace-normal' },
+    { key: 'File_Id1', label: 'File ID', icon: 'file', className: 'w-[10%]' },
+    { key: 'Account_Name', label: 'Account Name', icon: 'account', className: 'w-[14%]' },
+    { key: 'Account_Number', label: 'Account Number', icon: 'id', className: 'w-[13%]' },
+    { key: 'Report_Created_On', label: 'Report Created On', icon: 'calendar', className: 'w-[10%]' },
+    { key: 'Date_Opened', label: 'Date Opened', icon: 'clock', className: 'w-[9%]' },
+    { key: 'Result_Text', label: 'Result Text', icon: 'note', className: 'w-[44%]' },
   ];
 
   function cellValue(record, key) {
@@ -31,11 +31,15 @@ function DisputeDetailsCard({
 
   return (
     <section className="relative z-10 overflow-visible bg-white rounded-xl border border-gray-200 px-6 py-5">
-      <h2 className="text-sm font-semibold text-gray-800 mb-4">Dispute Details</h2>
+      <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-gray-800">
+        <CreditFactorIcon name="dispute" size={16} className="text-indigo-600" />
+        Dispute Details
+      </h2>
       <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-4 items-end">
         <div>
           <CreditFactorDropdown
             label="Select Any Provider"
+            icon="bureau"
             value={provider}
             onChange={onProviderChange}
             options={providerOptions}
@@ -45,6 +49,7 @@ function DisputeDetailsCard({
         <div>
           <CreditFactorDropdown
             label="Select Any Date"
+            icon="calendar"
             value={disputeDate}
             onChange={onDisputeDateChange}
             options={disputeDateOptions}
@@ -63,24 +68,30 @@ function DisputeDetailsCard({
               : 'bg-gray-200 text-gray-400 cursor-not-allowed'
           }`}
         >
+          <span className="inline-flex items-center gap-1.5">
+            <CreditFactorIcon name="send" size={14} />
           Submit
+          </span>
         </button>
       </div>
 
       {hasSubmitted && (
         <div className="mt-5 rounded-xl border border-gray-200 bg-white overflow-hidden">
           {rows.length ? (
-            <div className="overflow-auto max-h-[288px]">
-              <table className="w-full min-w-[1320px] table-fixed border-collapse text-sm">
+            <div className="max-h-[288px] overflow-y-auto overflow-x-hidden">
+              <table className="w-full table-fixed border-collapse text-sm">
                 <thead className="bg-gray-50 sticky top-0 z-10">
                   <tr>
                     {columns.map((column) => (
                       <th
                         key={column.key}
                         scope="col"
-                        className={`border border-gray-200 px-3 py-3 text-left text-sm font-semibold text-gray-800 align-middle ${column.className}`}
+                        className={`break-words border border-gray-200 px-3 py-3 text-left text-sm font-semibold text-gray-800 align-middle ${column.className}`}
                       >
-                        {column.label}
+                        <span className="flex items-center gap-1.5">
+                          <CreditFactorIcon name={column.icon} size={14} className="shrink-0 text-gray-400" />
+                          {column.label}
+                        </span>
                       </th>
                     ))}
                   </tr>
@@ -91,7 +102,7 @@ function DisputeDetailsCard({
                       {columns.map((column) => (
                         <td
                           key={column.key}
-                          className={`border border-gray-200 px-3 py-3 leading-6 text-gray-900 align-top ${column.className}`}
+                          className={`break-words border border-gray-200 px-3 py-3 leading-6 text-gray-900 align-top ${column.className}`}
                         >
                           {cellValue(record, column.key)}
                         </td>

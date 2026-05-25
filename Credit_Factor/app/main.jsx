@@ -38,37 +38,37 @@ const DEFAULT_CREDIT_FACTOR_STATS = [
     title: 'Hard Inquiries',
     value: '-',
     badgeValue: '-',
-    note: "Number of times you've applied for credit",
+    note: "Tracks how often you've applied for new credit, which can temporarily impact your credit score.",
   },
   {
     title: 'Total Accounts',
     value: '-',
     badgeValue: '-',
-    note: 'Total open and close accounts',
+    note: 'Shows the total number of credit accounts you’ve opened and maintained over time.',
   },
   {
     title: 'Credit Age',
     value: '-',
     badgeValue: '-',
-    note: 'Average age of your open accounts',
+    note: 'Measures the average age of your credit accounts, reflecting your credit history experience.',
   },
   {
     title: 'Derogatory marks',
     value: '-',
     badgeValue: '-',
-    note: 'Collection, tax liens, bankruptcies or civil judgments on your report',
+    note: 'Highlights serious negative records such as collections, bankruptcies, tax liens, or legal judgments.',
   },
   {
     title: 'Credit card use',
     value: '-',
     badgeValue: '-',
-    note: "How much credit you're using compared to your total limits",
+    note: 'Indicates how much of your available credit limit you’re currently using across all cards.',
   },
   {
     title: 'Payment history',
     value: '-',
     badgeValue: '-',
-    note: "Percentage of payments you've made on time",
+    note: 'Represents your consistency in making payments on time, one of the biggest factors affecting your score.',
   },
 ];
 
@@ -185,32 +185,32 @@ function buildCreditFactorStats(records) {
     {
       title: 'Hard Inquiries',
       value: sumField(records, 'Hard_Inquiries'),
-      note: "Number of times you've applied for credit",
+      note: "Tracks how often you've applied for new credit, which can temporarily impact your credit score.",
     },
     {
       title: 'Total Accounts',
       value: sumField(records, 'Total_Accounts'),
-      note: 'Total open and close accounts',
+      note: 'Shows the total number of credit accounts you’ve opened and maintained over time.',
     },
     {
       title: 'Credit Age',
       value: latestText(records, 'Credit_Age'),
-      note: 'Average age of your open accounts',
+      note: 'Measures the average age of your credit accounts, reflecting your credit history experience.',
     },
     {
       title: 'Derogatory marks',
       value: latestText(records, 'Derogatory_marks'),
-      note: 'Collection, tax liens, bankruptcies or civil judgments on your report',
+      note: 'Highlights serious negative records such as collections, bankruptcies, tax liens, or legal judgments.',
     },
     {
       title: 'Credit card use',
       value: sumField(records, 'Credit_Card_Use'),
-      note: "How much credit you're using compared to your total limits",
+      note: 'Indicates how much of your available credit limit you’re currently using across all cards.',
     },
     {
       title: 'Payment history',
       value: latestText(records, 'Payment_History'),
-      note: "Percentage of payments you've made on time",
+      note: 'Represents your consistency in making payments on time, one of the biggest factors affecting your score.',
     },
   ];
 }

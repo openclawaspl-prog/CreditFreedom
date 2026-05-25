@@ -1,67 +1,112 @@
-/*
-  ActionButtonsBar
-  Top-right action buttons: Send Text Message | Send Mail | Contract ▼ | ⋮
-  Mirrors the Zoho CRM page-level controls shown in the widget screenshot.
-  Wire up sendTextMessage() and contractItems to your Zoho APIs as needed.
-*/
 const { useState: useAbState, useEffect: useAbEffect, useRef: useAbRef } = React;
 
-/* Chevron icon */
 const IcChevron = () => (
   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="6 9 12 15 18 9"/>
-  </svg>
-);
-const IcDots = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-    <circle cx="12" cy="5"  r="1.8"/>
-    <circle cx="12" cy="12" r="1.8"/>
-    <circle cx="12" cy="19" r="1.8"/>
+    <polyline points="6 9 12 15 18 9" />
   </svg>
 );
 
-/* Generic bordered button */
-const OutlineBtn = ({ onClick, children, className = '' }) => (
-  <button
-    onClick={onClick}
-    className={`flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-slate-800 bg-white border border-white/80 rounded-lg hover:bg-sky-50 active:bg-sky-100 transition-colors shadow-lg whitespace-nowrap ${className}`}
-    style={{ boxShadow: '0 10px 24px rgba(15, 23, 42, 0.18)' }}
-  >
-    {children}
-  </button>
-);
+const ActionBtn = ({ onClick, children, tone = 'blue', className = '' }) => {
+  const toneClass = tone === 'green'
+    ? 'border-emerald-200 text-emerald-700 hover:border-emerald-300 hover:text-emerald-800'
+    : tone === 'gray'
+      ? 'border-slate-200 text-slate-700 hover:border-slate-300 hover:text-slate-900'
+      : 'border-sky-200 text-sky-700 hover:border-sky-300 hover:text-sky-800';
 
-/* Dropdown wrapper — closes when clicking outside */
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex h-9 items-center gap-1.5 rounded-full border bg-white/82 px-3.5 text-sm font-bold leading-none shadow-sm transition-all whitespace-nowrap backdrop-blur-md hover:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100 ${toneClass} ${className}`}
+      style={{ boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.72)' }}
+    >
+      {children}
+    </button>
+  );
+};
+
 function Dropdown({ trigger, children }) {
   const [open, setOpen] = useAbState(false);
+  const [menuStyle, setMenuStyle] = useAbState(null);
   const ref = useAbRef(null);
+  const menuRef = useAbRef(null);
 
   useAbEffect(() => {
-    if (!open) return;
-    function handle(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
+    if (!open) return undefined;
+    function handle(event) {
+      if (
+        ref.current &&
+        !ref.current.contains(event.target) &&
+        menuRef.current &&
+        !menuRef.current.contains(event.target)
+      ) {
+        setOpen(false);
+      }
+    }
     document.addEventListener('mousedown', handle);
     return () => document.removeEventListener('mousedown', handle);
   }, [open]);
 
+  useAbEffect(() => {
+    if (!open || !ref.current) {
+      setMenuStyle(null);
+      return undefined;
+    }
+
+    function updateMenuPosition() {
+      if (!ref.current) return;
+      const rect = ref.current.getBoundingClientRect();
+      const menuWidth = 258;
+      const left = Math.min(Math.max(8, rect.left), Math.max(8, window.innerWidth - menuWidth - 8));
+      setMenuStyle({
+        position: 'fixed',
+        top: `${rect.bottom + 10}px`,
+        left: `${left}px`,
+        width: `${menuWidth}px`,
+        zIndex: 2147483647,
+      });
+    }
+
+    updateMenuPosition();
+    window.addEventListener('resize', updateMenuPosition);
+    window.addEventListener('scroll', updateMenuPosition, true);
+    return () => {
+      window.removeEventListener('resize', updateMenuPosition);
+      window.removeEventListener('scroll', updateMenuPosition, true);
+    };
+  }, [open]);
+
+  function toggle() {
+    setOpen((prev) => !prev);
+  }
+
+  const menu = open && menuStyle ? (
+    <div
+      ref={menuRef}
+      className="rounded-xl border border-slate-200 bg-white py-1.5 shadow-2xl"
+      style={{
+        ...menuStyle,
+        boxShadow: '0 18px 45px rgba(15, 23, 42, 0.16)',
+      }}
+    >
+      <span className="absolute -top-3 left-5 h-0 w-0 border-x-[12px] border-b-[12px] border-x-transparent border-b-white" />
+      {children(() => setOpen(false))}
+    </div>
+  ) : null;
+
   return (
     <div ref={ref} className="relative">
-      {trigger(() => setOpen(v => !v), open)}
-      {open && (
-        <div
-          className="absolute right-0 top-full mt-1.5 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-50"
-          style={{ minWidth: 160 }}
-        >
-          {children(() => setOpen(false))}
-        </div>
-      )}
+      {trigger(toggle, open)}
+      {menu && ReactDOM.createPortal(menu, document.body)}
     </div>
   );
 }
 
 const DropItem = ({ onClick, children }) => (
   <button
+    type="button"
     onClick={onClick}
-    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+    className="w-full px-4 py-2.5 text-left text-sm font-semibold text-slate-600 transition-colors hover:bg-sky-50/80 hover:text-sky-700"
   >
     {children}
   </button>
@@ -71,7 +116,6 @@ function ActionButtonsBar({ contactId, entity }) {
   const targetEntity = entity || 'Contacts';
 
   function handleSendTextMessage() {
-    /* TODO: wire up to your SMS provider / Zoho telephony API */
     if (window.ZOHO && ZOHO.CRM && ZOHO.CRM.UI) {
       ZOHO.CRM.UI.Record.open({ Entity: targetEntity, RecordID: contactId });
     }
@@ -84,64 +128,50 @@ function ActionButtonsBar({ contactId, entity }) {
     }
   }
 
+  function noop() {}
+
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2">
-
-      <OutlineBtn onClick={handleSendTextMessage}>
+    <div className="flex flex-wrap items-center justify-start gap-2 px-3 py-2" style={{ zIndex: 100, overflow: 'visible' }}>
+      <ActionBtn tone="green" onClick={handleSendTextMessage}>
         Send Text Message
-      </OutlineBtn>
+      </ActionBtn>
 
-      <OutlineBtn onClick={handleSendMail}>
+      <ActionBtn tone="blue" onClick={noop}>
+        Credit Report
+      </ActionBtn>
+
+      <ActionBtn tone="green" onClick={handleSendMail}>
         Send Mail
-      </OutlineBtn>
+      </ActionBtn>
 
-      {/* Contract dropdown */}
-      <Dropdown
-        trigger={(toggle, open) => (
-          <OutlineBtn onClick={toggle}>
-            Contract <IcChevron />
-          </OutlineBtn>
-        )}
-      >
-        {(close) => (
-          <>
-            <DropItem onClick={() => {
-              close();
-            }}>View Contract</DropItem>
-            <DropItem onClick={() => {
-              close();
-              ZOHO.CRM.UI.Record.create &&
-                ZOHO.CRM.UI.Record.create({ Entity: 'Deals' });
-            }}>Create Contract</DropItem>
-          </>
-        )}
-      </Dropdown>
+      <ActionBtn tone="blue" onClick={noop}>
+        Add New Data
+      </ActionBtn>
 
-      {/* Three-dots more menu */}
       <Dropdown
         trigger={(toggle) => (
-          <button
-            onClick={toggle}
-            className="p-2.5 text-slate-700 bg-white border border-white/80 rounded-lg hover:bg-sky-50 shadow-lg transition-colors"
-            style={{ boxShadow: '0 10px 24px rgba(15, 23, 42, 0.18)' }}
-            title="More options"
-          >
-            <IcDots />
-          </button>
+          <ActionBtn tone="gray" onClick={toggle}>
+            Contract <IcChevron />
+          </ActionBtn>
         )}
       >
         {(close) => (
           <>
-            <DropItem onClick={() => { close(); window.print && window.print(); }}>Print</DropItem>
-            <DropItem onClick={() => {
-              close();
-              ZOHO.CRM.UI.Record.open &&
-                ZOHO.CRM.UI.Record.open({ Entity: targetEntity, RecordID: contactId });
-            }}>Open Record</DropItem>
+            <DropItem onClick={() => { close(); }}>Agreement</DropItem>
+            <DropItem onClick={() => { close(); }}>Disclosure</DropItem>
+            <DropItem onClick={() => { close(); }}>Remove Fraud Alert/Freeze</DropItem>
+            <DropItem onClick={() => { close(); }}>Experian Victim Statement</DropItem>
           </>
         )}
       </Dropdown>
 
+      <ActionBtn tone="blue" onClick={noop}>
+        Land Lord Letter
+      </ActionBtn>
+
+      <ActionBtn tone="green" onClick={noop}>
+        Send Text/Mail
+      </ActionBtn>
     </div>
   );
 }

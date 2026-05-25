@@ -40,7 +40,7 @@ const DT_SECTIONS = [
   { key: 'charged', label: 'Charged Off Account' },
   { key: 'closed', label: 'Closed Account' },
   { key: 'account_change', label: 'Account Change' },
-  { key: 'removed', label: 'Removed Account' },
+  { key: 'removed', label: 'Deleted Accounts' },
 ];
 
 const COLLECTION_SECTIONS = [
@@ -48,12 +48,14 @@ const COLLECTION_SECTIONS = [
   { key: 'new', label: 'New Collections' },
   { key: 'closed', label: 'Closed Collections' },
   { key: 'collection', label: 'Collections' },
+  { key: 'removed', label: 'Deleted Collections' },
 ];
 
 const COLLECTION_MOVE_OPTIONS = [
   { key: 'new', label: 'New' },
   { key: 'closed', label: 'Closed' },
   { key: 'collection', label: 'Collection' },
+  { key: 'removed', label: 'Deleted' },
 ];
 
 /* Field API name map — single place to update */
@@ -90,7 +92,8 @@ const F = {
   collectionOriginalCreditor: 'Original_Creditor',
   collectionOpenedDate: 'Opened_Date',
   collectionClient: 'Client',
-  collectionBlockType: 'Bock_Type',
+  collectionBlockType: 'Block_Type',
+  collectionDisplayStatus: 'Display_Status',
 };
 
 function dtFormatDate(v) {
@@ -465,6 +468,36 @@ function upsertSortedOption(options, option) {
   return sortOptionsAsc(hasOption ? existing : [...existing, option]);
 }
 
+function reasonInstructionDisplay(value, fallback) {
+  const text = dtStr(value).trim();
+  if (!text || text.toLowerCase() === 'select') return fallback;
+  return text;
+}
+
+function SeeMoreText({ value, fallback, className = 'text-[11px] text-gray-600', limit = 60 }) {
+  const [expanded, setExpanded] = useDtState(false);
+  const text = reasonInstructionDisplay(value, fallback);
+  const isLong = text.length > limit;
+  const visibleText = !isLong || expanded ? text : `${text.slice(0, limit)}...`;
+
+  return (
+    <span className={`${className} block`}>
+      <span className={expanded ? 'block max-h-24 overflow-y-auto pr-1' : ''}>
+        {visibleText}
+      </span>
+      {isLong && (
+        <button
+          type="button"
+          onClick={() => setExpanded(prev => !prev)}
+          className="ml-1 text-[11px] font-semibold text-sky-700 hover:text-sky-900 hover:underline"
+        >
+          {expanded ? 'See less' : 'See more'}
+        </button>
+      )}
+    </span>
+  );
+}
+
 function masterInfoTypeValue(row) {
   return dtStr(
     getRowValue(row, 'Type_of_information') ||
@@ -726,12 +759,14 @@ function BulkSelectDropdown({ label, placeholder, options, value, disabled, onCh
 function AccountBulkControls({
   accounts,
   selectedIds,
+  actionsTargetId,
+  onResetLocal,
   onToggleAll,
   onToggleBureau,
   reasonOptions,
   instructionOptions,
-  onBulkApply,
-  onCreateMasterOption,
+  onApplyReason,
+  onApplyInstruction,
   busy,
 }) {
   const [showCustom, setShowCustom] = useDtState(false);
@@ -739,15 +774,18 @@ function AccountBulkControls({
   const [customInstruction, setCustomInstruction] = useDtState('');
   const [selectedReason, setSelectedReason] = useDtState('');
   const [selectedInstruction, setSelectedInstruction] = useDtState('');
+  const [selectedTemplate, setSelectedTemplate] = useDtState('ADD FRAUD ALERT');
 
   const activeAccounts = accounts || [];
   const allChecked = activeAccounts.length > 0 && activeAccounts.every(row => selectedIds.has(row.id));
-
-  useDtEffect(() => {
-    if (selectedIds.size !== 0) return;
-    setSelectedReason('');
-    setSelectedInstruction('');
-  }, [selectedIds.size]);
+  const hasSelection = selectedIds && selectedIds.size > 0;
+  const templateOptions = [
+    'ADD FRAUD ALERT',
+    'AGREEMENT',
+    'DISCLOSURE',
+    'REMOVE FRAUD ALERT/FREEZE',
+    'EXPERIAN VICTIM STATEMENT',
+  ].map(label => ({ id: label, label }));
 
   function bureauRows(name) {
     return activeAccounts.filter(row => accountBulkBureau(row[F.Creditor]) === name);
@@ -758,99 +796,176 @@ function AccountBulkControls({
     return rows.length > 0 && rows.every(row => selectedIds.has(row.id));
   }
 
-  function onCustomKeyDown(event, type) {
-    if (event.key !== 'Enter' || event.shiftKey) return;
-    event.preventDefault();
+  function bulkAction() {}
 
-    const value = type === 'Reason' ? customReason.trim() : customInstruction.trim();
-    if (!value || busy) return;
+  useDtEffect(() => {
+    if (selectedIds.size !== 0) return;
+    setSelectedReason('');
+    setSelectedInstruction('');
+    setShowCustom(false);
+    setCustomReason('');
+    setCustomInstruction('');
+  }, [selectedIds.size]);
 
-    onCreateMasterOption(type, value).then((created) => {
-      if (!created) return;
-      if (type === 'Reason') setCustomReason('');
-      if (type === 'Instruction') setCustomInstruction('');
-    });
+  function handleReset() {
+    setSelectedReason('');
+    setSelectedInstruction('');
+    setShowCustom(false);
+    setCustomReason('');
+    setCustomInstruction('');
+    onResetLocal();
   }
 
-  return (
-    <div className="cf-glass relative rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm" style={{ zIndex: 50, overflow: 'visible' }}>
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-        <label className="inline-flex items-center gap-2 text-sm font-semibold text-gray-800">
-          <input
-            type="checkbox"
-            checked={allChecked}
-            onChange={(event) => onToggleAll(event.target.checked)}
-            className="h-4 w-4 rounded border-gray-300"
-          />
-          Select All Account
-        </label>
-        {['Equifax', 'TransUnion', 'Experian'].map((bureau) => (
-          <label key={bureau} className="inline-flex items-center gap-2 text-sm font-semibold text-gray-800">
-            <input
-              type="checkbox"
-              checked={bureauChecked(bureau)}
-              onChange={(event) => onToggleBureau(bureau, event.target.checked)}
-              className="h-4 w-4 rounded border-gray-300"
-            />
-            Select All {bureau} Account
-          </label>
-        ))}
+  function bulkActionButton(label, tone = 'blue', onClick = bulkAction) {
+    const toneClass = tone === 'green'
+      ? 'border-emerald-200 text-emerald-700 hover:border-emerald-300 hover:text-emerald-800'
+      : tone === 'orange'
+        ? 'border-amber-200 text-amber-700 hover:border-amber-300 hover:text-amber-800'
+        : tone === 'red'
+          ? 'border-rose-200 text-rose-700 hover:border-rose-300 hover:text-rose-800'
+          : 'border-sky-200 text-sky-700 hover:border-sky-300 hover:text-sky-800';
+
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`inline-flex h-9 items-center justify-center rounded-lg border bg-white/82 px-3.5 text-sm font-bold shadow-sm transition-all whitespace-nowrap backdrop-blur-md hover:bg-white focus:outline-none focus:ring-4 focus:ring-sky-100 ${toneClass}`}
+        style={{ boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.72)' }}
+      >
+        {label}
+      </button>
+    );
+  }
+
+  const actionsTarget = actionsTargetId && typeof document !== 'undefined'
+    ? document.getElementById(actionsTargetId)
+    : null;
+  const selectedActions = hasSelection ? (
+    <div className="cf-glass relative w-full rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm" style={{ zIndex: 45, overflow: 'visible' }}>
+      <div className="flex flex-wrap items-center gap-2">
+        {bulkActionButton('Print Letter', 'green')}
+        {bulkActionButton('Print Letter In New Format', 'orange')}
+        {bulkActionButton('TransUnion', 'blue')}
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-        <BulkSelectDropdown
-          label="Reason"
-          placeholder="Select reason"
-          options={reasonOptions}
-          value={selectedReason}
-          disabled={busy || selectedIds.size === 0}
-          onChange={(optionId) => {
-            setSelectedReason(optionId);
-            onBulkApply(F.reason, optionId);
-          }}
-        />
-        <BulkSelectDropdown
-          label="Instruction"
-          placeholder="Select instruction"
-          options={instructionOptions}
-          value={selectedInstruction}
-          disabled={busy || selectedIds.size === 0}
-          onChange={(optionId) => {
-            setSelectedInstruction(optionId);
-            onBulkApply(F.instruction, optionId);
-          }}
-        />
-      </div>
-
-      <label className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-gray-800">
-        <input
-          type="checkbox"
-          checked={showCustom}
-          onChange={(event) => setShowCustom(event.target.checked)}
-          className="h-4 w-4 rounded border-gray-300"
-        />
-        Add Custom Reason/Instruction
-      </label>
-
-      {showCustom && (
-        <div className="mt-2 grid grid-cols-1 gap-4 md:grid-cols-2">
-          <textarea
-            value={customReason}
-            onChange={(event) => setCustomReason(event.target.value)}
-            onKeyDown={(event) => onCustomKeyDown(event, 'Reason')}
-            placeholder="Add Custom Reason"
-            className="min-h-[62px] resize-y rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-300"
-          />
-          <textarea
-            value={customInstruction}
-            onChange={(event) => setCustomInstruction(event.target.value)}
-            onKeyDown={(event) => onCustomKeyDown(event, 'Instruction')}
-            placeholder="Add Custom Instruction"
-            className="min-h-[62px] resize-y rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-300"
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <div className="w-full sm:w-[460px]">
+          <BulkSelectDropdown
+            label="Select Template"
+            placeholder="Select template"
+            options={templateOptions}
+            value={selectedTemplate}
+            disabled={false}
+            onChange={setSelectedTemplate}
           />
         </div>
-      )}
+        {bulkActionButton('Print Letter With Selected Format', 'green')}
+        {bulkActionButton('Send Dispute to Experian', 'red')}
+        {bulkActionButton('Transunion Rental History', 'orange')}
+        {bulkActionButton('Rental Glow History', 'green')}
+      </div>
     </div>
+  ) : null;
+
+  return (
+    <>
+      <div className="cf-glass relative rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm" style={{ zIndex: 50, overflow: 'visible' }}>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+          <label className="inline-flex items-center gap-2 text-sm font-semibold text-gray-800">
+            <input
+              type="checkbox"
+              checked={allChecked}
+              onChange={(event) => onToggleAll(event.target.checked)}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            Select All Account
+          </label>
+          {['Equifax', 'TransUnion', 'Experian'].map((bureau) => (
+            <label key={bureau} className="inline-flex items-center gap-2 text-sm font-semibold text-gray-800">
+              <input
+                type="checkbox"
+                checked={bureauChecked(bureau)}
+                onChange={(event) => onToggleBureau(bureau, event.target.checked)}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              Select All {bureau} Account
+            </label>
+          ))}
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <BulkSelectDropdown
+            label="Reason"
+            placeholder="Select reason"
+            options={reasonOptions}
+            value={selectedReason}
+            disabled={busy || activeAccounts.length === 0}
+            onChange={(optionId) => {
+              setSelectedReason(optionId);
+              onApplyReason(optionId);
+            }}
+          />
+          <BulkSelectDropdown
+            label="Instruction"
+            placeholder="Select instruction"
+            options={instructionOptions}
+            value={selectedInstruction}
+            disabled={busy || activeAccounts.length === 0}
+            onChange={(optionId) => {
+              setSelectedInstruction(optionId);
+              onApplyInstruction(optionId);
+            }}
+          />
+        </div>
+
+        <label className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-gray-800">
+          <input
+            type="checkbox"
+            checked={showCustom}
+            onChange={(event) => setShowCustom(event.target.checked)}
+            className="h-4 w-4 rounded border-gray-300"
+          />
+          Add Custom Reason/Instruction
+        </label>
+        <button
+          type="button"
+          onClick={handleReset}
+          className="ml-4 mt-4 inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 bg-white/82 px-3.5 text-sm font-bold text-slate-700 shadow-sm transition-all hover:bg-white hover:border-slate-300 focus:outline-none focus:ring-4 focus:ring-sky-100"
+          style={{ boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.72)' }}
+        >
+          Reset
+        </button>
+
+        {showCustom && (
+          <div className="mt-2 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <textarea
+              value={customReason}
+              onChange={(event) => {
+                const value = event.target.value;
+                setCustomReason(value);
+                onApplyReason(value, { custom: true });
+              }}
+              placeholder="Add Custom Reason"
+              className="min-h-[62px] resize-y rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-300"
+            />
+            <textarea
+              value={customInstruction}
+              onChange={(event) => {
+                const value = event.target.value;
+                setCustomInstruction(value);
+                onApplyInstruction(value, { custom: true });
+              }}
+              placeholder="Add Custom Instruction"
+              className="min-h-[62px] resize-y rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-300"
+            />
+          </div>
+        )}
+      </div>
+
+      {selectedActions && (actionsTarget && ReactDOM.createPortal
+        ? ReactDOM.createPortal(selectedActions, actionsTarget)
+        : <div className="mt-3">{selectedActions}</div>)}
+    </>
   );
 }
 
@@ -938,6 +1053,475 @@ const IcMove = () => (
     <circle cx="15" cy="17" r="1" />
   </svg>
 );
+const IcPlus = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+);
+
+const ACCOUNT_CREDITOR_OPTIONS = ['Equifax', 'TransUnion', 'Experian'];
+const ACCOUNT_TAG_OPTIONS = ['not-started', 'started'];
+const ACCOUNT_DISPUTE_STATUS_OPTIONS = ['New', 'Initial', 'Completed'];
+const ACCOUNT_CHANGE_OPTIONS = ['no', 'yes'];
+const ACCOUNT_DISPLAY_STATUS_OPTIONS = [
+  'Unspecified',
+  'Positive',
+  'Deleted',
+  'Repaired',
+  'In Dispute',
+  'Verified Negative',
+  'Updated',
+  'Account_change_account_balance_removed',
+];
+const toChoiceOptions = (values) => values.map(value => ({ value, label: value }));
+
+function AddAccountModal({ section, contactId, anchorY, reasonOptions = [], instructionOptions = [], onClose, onSave, saving }) {
+  const [modalTop, setModalTop] = useDtState(null);
+  const [openSelect, setOpenSelect] = useDtState(null);
+  const [form, setForm] = useDtState({
+    Credit_Repair_ID: '',
+    Creditor_Name: '',
+    Reason: '',
+    Instruction: '',
+    Account_Type: '',
+    Account_Number1: '',
+    Name: '',
+    Account_Status: '',
+    Payment_Status: '',
+    Worst_Payment_Status: '',
+    Open_Date: '',
+    Times_Days_Late: '',
+    Remarks: '',
+    Credit_Balance: '',
+    Old_Credit_Balance: '',
+    Previous_Credit_Balance: '',
+    creditOrBalanceValue: '',
+    New_Remark: '',
+    Dispute_Status: '',
+    Creditor: '',
+    Amount_Of_Late: '',
+    Tag_Value: '',
+    Account_Change: '',
+    Display_Status: '',
+    Current_Late_Count: '',
+    Updated_Late_Count: '',
+    Status_of_Account: '',
+  });
+
+  useDtEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = 'auto'; };
+  }, []);
+
+  useDtEffect(() => {
+    function placeModal() {
+      const viewportHeight = window.innerHeight || 0;
+      const modalHeight = Math.min(viewportHeight * 0.82, 720);
+      const minTop = 8 + modalHeight / 2;
+      const maxTop = Math.max(minTop, viewportHeight - 8 - modalHeight / 2);
+      const preferredTop = Number(anchorY) || viewportHeight / 2;
+      setModalTop(Math.min(Math.max(preferredTop, minTop), maxTop));
+    }
+
+    placeModal();
+    window.addEventListener('resize', placeModal);
+    return () => window.removeEventListener('resize', placeModal);
+  }, [anchorY]);
+
+  function updateField(name, value) {
+    setForm(prev => ({
+      ...prev,
+      [name]: name === 'Account_Number1' ? String(value).slice(0, 12) : value,
+    }));
+  }
+
+  function submit(event) {
+    event.preventDefault();
+    if (!isRequiredComplete || !isAccountNumberValid) return;
+    onSave({
+      ...form,
+      Client_ID: contactId ? { id: contactId } : undefined,
+      Block_Type: section.key,
+      Delete_flag: false,
+    });
+  }
+
+  const requiredFields = [
+    'Credit_Repair_ID',
+    'Creditor_Name',
+    'Account_Number1',
+    'Name',
+    'Creditor',
+    'Tag_Value',
+    'Display_Status',
+  ];
+  const isRequiredComplete = requiredFields.every(name => dtStr(form[name]).trim());
+  const isAccountNumberValid = dtStr(form.Account_Number1).trim().length <= 12;
+  const numberInputModeFields = new Set([
+    'Credit_Repair_ID',
+    'Amount_Of_Late',
+    'Current_Late_Count',
+    'Updated_Late_Count',
+  ]);
+
+  function fieldInput(label, name, placeholder, type = 'text', required = false) {
+    const inputType = type === 'number' ? 'text' : type;
+    return (
+      <label className="block">
+        <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">
+          {label}{required && <span className="ml-1 text-red-500">*</span>}
+        </span>
+        <input
+          type={inputType}
+          inputMode={numberInputModeFields.has(name) ? 'numeric' : undefined}
+          pattern={numberInputModeFields.has(name) ? '[0-9]*' : undefined}
+          maxLength={name === 'Account_Number1' ? 12 : undefined}
+          value={form[name]}
+          onChange={(event) => updateField(name, event.target.value)}
+          placeholder={placeholder}
+          required={required}
+          className="w-full rounded-xl border border-slate-200 bg-white/95 px-3.5 py-2.5 text-sm font-semibold text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+        />
+        {name === 'Account_Number1' && !isAccountNumberValid && (
+          <span className="mt-1 block text-xs font-semibold text-red-500">Maximum 12 characters allowed.</span>
+        )}
+      </label>
+    );
+  }
+
+  function fieldTextarea(label, name, placeholder) {
+    return (
+      <label className="block md:col-span-2">
+        <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">{label}</span>
+        <textarea
+          value={form[name]}
+          onChange={(event) => updateField(name, event.target.value)}
+          placeholder={placeholder}
+          className="min-h-[78px] w-full resize-y rounded-xl border border-slate-200 bg-white/95 px-3.5 py-2.5 text-sm font-semibold text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+        />
+      </label>
+    );
+  }
+
+  function fieldCustomSelect(label, name, options, required = false, placeholder = 'Select option') {
+    const normalizedOptions = (options || []).map(option => (
+      typeof option === 'object'
+        ? { value: option.id || option.value || option.label, label: option.label || option.name || option.value || option.id }
+        : { value: option, label: option }
+    ));
+    const selected = normalizedOptions.find(option => String(option.value) === String(form[name]));
+    const isOpen = openSelect === name;
+
+    return (
+      <label className="relative block">
+        <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">
+          {label}{required && <span className="ml-1 text-red-500">*</span>}
+        </span>
+        <button
+          type="button"
+          onClick={() => setOpenSelect(isOpen ? null : name)}
+          className={`flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-left text-sm font-semibold shadow-sm outline-none transition hover:border-slate-300 focus:border-sky-400 focus:ring-4 focus:ring-sky-100 ${selected ? 'text-slate-800' : 'text-slate-400'}`}
+        >
+          <span className="truncate">{selected ? selected.label : placeholder}</span>
+          <span className={`ml-3 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}>⌄</span>
+        </button>
+        {isOpen && (
+          <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
+            <button
+              type="button"
+              onClick={() => {
+                updateField(name, '');
+                setOpenSelect(null);
+              }}
+              className="w-full px-3.5 py-2 text-left text-sm font-semibold text-slate-400 hover:bg-slate-50"
+            >
+              {placeholder}
+            </button>
+            {normalizedOptions.map(option => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => {
+                  updateField(name, option.value);
+                  setOpenSelect(null);
+                }}
+                className={`w-full px-3.5 py-2 text-left text-sm font-semibold hover:bg-sky-50 ${
+                  String(option.value) === String(form[name]) ? 'bg-sky-50 text-sky-700' : 'text-slate-700'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </label>
+    );
+  }
+
+  function fieldOptionSelect(label, name, options, placeholder) {
+    return fieldCustomSelect(label, name, sortOptionsAsc(options), false, placeholder);
+  }
+
+  return ReactDOM.createPortal(
+    <div
+      className="fixed inset-0 z-[2147483647] flex items-start justify-center bg-gray-500/60 px-4 py-2"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <form
+        onSubmit={submit}
+        className="max-h-[82vh] w-full max-w-3xl overflow-hidden rounded-[22px] border border-slate-200 bg-white p-0 shadow-[0_28px_80px_rgba(15,23,42,0.28)] ring-1 ring-slate-900/5"
+        style={{
+          position: 'fixed',
+          top: modalTop == null ? '50%' : `${modalTop}px`,
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+        }}
+      >
+        <div className="border-b border-slate-200 bg-white px-6 py-5">
+          <div>
+            <p className="text-xl font-black text-slate-950">Add Account</p>
+            <p className="mt-1 text-sm font-semibold text-slate-500">{section.label}</p>
+          </div>
+        </div>
+
+        <div
+          className="max-h-[390px] overflow-y-auto bg-white px-6 py-5"
+          style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(100,116,139,0.58) rgba(241,245,249,0.9)' }}
+        >
+          <div className="grid grid-cols-1 gap-x-4 gap-y-4 md:grid-cols-2">
+            {fieldInput('Credit Repair ID', 'Credit_Repair_ID', 'Enter credit repair id', 'number', true)}
+            {fieldInput('Creditor Name', 'Creditor_Name', 'Enter creditor name', 'text', true)}
+            {fieldOptionSelect('Reason', 'Reason', reasonOptions, 'Select reason')}
+            {fieldOptionSelect('Instruction', 'Instruction', instructionOptions, 'Select instruction')}
+            {fieldInput('Account Type', 'Account_Type', 'Enter account type')}
+            {fieldInput('Client Account Name', 'Name', 'Enter account name', 'text', true)}
+            {fieldInput('Account Number', 'Account_Number1', 'Enter account number', 'text', true)}
+            {fieldInput('Account Status', 'Account_Status', 'Enter account status')}
+            {fieldInput('Payment Status', 'Payment_Status', 'Enter payment status')}
+            {fieldInput('Worst Payment Status', 'Worst_Payment_Status', 'Enter worst payment status')}
+            {fieldInput('Open Date', 'Open_Date', 'Select open date', 'datetime-local')}
+            {fieldInput('Times Days Late', 'Times_Days_Late', 'Enter times days late')}
+            {fieldInput('Credit Balance', 'Credit_Balance', 'Enter credit balance')}
+            {fieldInput('Old Credit Balance', 'Old_Credit_Balance', 'Enter old credit balance')}
+            {fieldInput('Previous Credit Balance', 'Previous_Credit_Balance', 'Enter previous credit balance')}
+            {fieldInput('Credit Or Balance Value', 'creditOrBalanceValue', 'Enter credit or balance value')}
+            {fieldInput('New Remark', 'New_Remark', 'Enter new remark')}
+            {fieldCustomSelect('Dispute Status', 'Dispute_Status', ACCOUNT_DISPUTE_STATUS_OPTIONS, false, 'Select dispute status')}
+            {fieldCustomSelect('Creditor', 'Creditor', ACCOUNT_CREDITOR_OPTIONS, true, 'Select creditor')}
+            {fieldInput('Amount Of Late', 'Amount_Of_Late', 'Enter amount of late', 'number')}
+            {fieldCustomSelect('Display Status', 'Display_Status', ACCOUNT_DISPLAY_STATUS_OPTIONS, true, 'Select display status')}
+            {fieldInput('Current Late Count', 'Current_Late_Count', 'Enter current late count', 'number')}
+            {fieldInput('Updated Late Count', 'Updated_Late_Count', 'Enter updated late count', 'number')}
+            {fieldCustomSelect('Tag Value', 'Tag_Value', ACCOUNT_TAG_OPTIONS, true, 'Select tag value')}
+            {fieldCustomSelect('Account Change', 'Account_Change', ACCOUNT_CHANGE_OPTIONS, false, 'Select account change')}
+            {fieldInput('Status of Account', 'Status_of_Account', 'Enter status of account')}
+            {fieldTextarea('Remarks', 'Remarks', 'Enter remarks')}
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 border-t border-slate-200 bg-white px-6 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-slate-200 bg-white/90 px-5 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-white hover:shadow-md"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving || !isRequiredComplete || !isAccountNumberValid}
+            className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-black text-white shadow-[0_10px_24px_rgba(2,132,199,0.26)] transition hover:bg-sky-700 hover:shadow-[0_14px_30px_rgba(2,132,199,0.32)] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-sky-600 disabled:hover:shadow-sm"
+          >
+            {/* <IcPlus /> */}
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+      </form>
+    </div>,
+    document.body
+  );
+}
+
+function AddBasicRecordModal({ title, subtitle, anchorY, fields, values, onChange, onClose, onSave, saving }) {
+  const [modalTop, setModalTop] = useDtState(null);
+  const [openSelect, setOpenSelect] = useDtState(null);
+
+  useDtEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = 'auto'; };
+  }, []);
+
+  useDtEffect(() => {
+    function placeModal() {
+      const viewportHeight = window.innerHeight || 0;
+      const modalHeight = Math.min(viewportHeight * 0.72, 560);
+      const minTop = 8 + modalHeight / 2;
+      const maxTop = Math.max(minTop, viewportHeight - 8 - modalHeight / 2);
+      const preferredTop = Number(anchorY) || viewportHeight / 2;
+      setModalTop(Math.min(Math.max(preferredTop, minTop), maxTop));
+    }
+
+    placeModal();
+    window.addEventListener('resize', placeModal);
+    return () => window.removeEventListener('resize', placeModal);
+  }, [anchorY]);
+
+  const requiredFields = fields.filter(field => field.required);
+  const canSave = requiredFields.every(field => {
+    if (field.readOnly) return dtStr(field.value).trim();
+    return dtStr(values[field.name]).trim();
+  });
+
+  function submit(event) {
+    event.preventDefault();
+    if (!canSave) return;
+    onSave();
+  }
+
+  function renderField(field) {
+    const label = (
+      <span className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">
+        {field.label}{field.required && <span className="ml-1 text-red-500">*</span>}
+      </span>
+    );
+
+    if (field.readOnly) {
+      return (
+        <label key={field.name} className="block">
+          {label}
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold text-slate-800">
+            {dtStr(field.value) || '-'}
+          </div>
+        </label>
+      );
+    }
+
+    if (field.type === 'select') {
+      const options = field.options || [];
+      const selected = options.find(option => String(option.value) === String(values[field.name]));
+      const isOpen = openSelect === field.name;
+      return (
+        <label key={field.name} className="relative block">
+          {label}
+          <button
+            type="button"
+            onClick={() => setOpenSelect(isOpen ? null : field.name)}
+            className={`flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-left text-sm font-semibold shadow-sm outline-none transition hover:border-slate-300 focus:border-sky-400 focus:ring-4 focus:ring-sky-100 ${selected ? 'text-slate-800' : 'text-slate-400'}`}
+          >
+            <span className="truncate">{selected ? selected.label : field.placeholder}</span>
+            <span className={`ml-3 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}>⌄</span>
+          </button>
+          {isOpen && (
+            <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
+              <button
+                type="button"
+                onClick={() => {
+                  onChange(field.name, '');
+                  setOpenSelect(null);
+                }}
+                className="w-full px-3.5 py-2 text-left text-sm font-semibold text-slate-400 hover:bg-slate-50"
+              >
+                {field.placeholder}
+              </button>
+              {options.map(option => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(field.name, option.value);
+                    setOpenSelect(null);
+                  }}
+                  className={`w-full px-3.5 py-2 text-left text-sm font-semibold hover:bg-sky-50 ${
+                    String(option.value) === String(values[field.name]) ? 'bg-sky-50 text-sky-700' : 'text-slate-700'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </label>
+      );
+    }
+
+    if (field.type === 'textarea') {
+      return (
+        <label key={field.name} className="block md:col-span-2">
+          {label}
+          <textarea
+            value={values[field.name] || ''}
+            onChange={(event) => onChange(field.name, event.target.value)}
+            placeholder={field.placeholder}
+            className="min-h-[78px] w-full resize-y rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+          />
+        </label>
+      );
+    }
+
+    return (
+      <label key={field.name} className="block">
+        {label}
+        <input
+          type={field.type || 'text'}
+          value={values[field.name] || ''}
+          onChange={(event) => onChange(field.name, event.target.value)}
+          placeholder={field.placeholder}
+          className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+        />
+      </label>
+    );
+  }
+
+  return ReactDOM.createPortal(
+    <div
+      className="fixed inset-0 z-[2147483647] flex items-start justify-center bg-gray-500/60 px-4 py-2"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <form
+        onSubmit={submit}
+        className="max-h-[72vh] w-full max-w-2xl overflow-hidden rounded-[20px] border border-slate-200 bg-white p-0 shadow-[0_28px_80px_rgba(15,23,42,0.28)] ring-1 ring-slate-900/5"
+        style={{
+          position: 'fixed',
+          top: modalTop == null ? '50%' : `${modalTop}px`,
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+        }}
+      >
+        <div className="border-b border-slate-200 bg-white px-6 py-5">
+          <p className="text-xl font-black text-slate-950">{title}</p>
+          {subtitle && <p className="mt-1 text-sm font-semibold text-slate-500">{subtitle}</p>}
+        </div>
+        <div className="max-h-[330px] overflow-y-auto bg-white px-6 py-5" style={{ scrollbarWidth: 'thin' }}>
+          <div className="grid grid-cols-1 gap-x-4 gap-y-4 md:grid-cols-2">
+            {fields.map(renderField)}
+          </div>
+        </div>
+        <div className="flex justify-end gap-3 border-t border-slate-200 bg-white px-6 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 hover:shadow-md"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving || !canSave}
+            className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-black text-white shadow-sm transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {/* <IcPlus />  */}
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+        </div>
+      </form>
+    </div>,
+    document.body
+  );
+}
 
 /* Move-to-section modal */
 function MoveModal({ currentKey, onMove, onClose }) {
@@ -1065,7 +1649,7 @@ function MoveModal({ currentKey, onMove, onClose }) {
 }
 
 /* One section card */
-function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions, instructionOptions, dropdownOpen, setDropdownOpen, readOnly = false, selectedIds = null, onSelectionChange = null }) {
+function SectionCard({ section, rows, onDelete, onMove, onSaveRow, onAddAccount, contactId, reasonOptions, instructionOptions, dropdownOpen, setDropdownOpen, readOnly = false, selectedIds = null, onSelectionChange = null }) {
   const [localSel, setLocalSel] = useDtState(new Set());
   const isControlledSelection = selectedIds && onSelectionChange;
   const sel = isControlledSelection ? selectedIds : localSel;
@@ -1081,6 +1665,8 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
   const bulkMoveButtonRef = React.useRef(null);
   const [bulkMoveMenuStyle, setBulkMoveMenuStyle] = useDtState(null);
   const [expandedRemarks, setExpandedRemarks] = useDtState(new Set());
+  const [addModalAnchorY, setAddModalAnchorY] = useDtState(null);
+  const [addSaving, setAddSaving] = useDtState(false);
 
   /* re-sync selection when rows change (e.g. after refresh) */
   useDtEffect(() => {
@@ -1348,6 +1934,15 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
     setBusy(false);
   }
 
+  async function handleAddAccount(values) {
+    if (!onAddAccount) return false;
+    setAddSaving(true);
+    const ok = await onAddAccount(section, values);
+    setAddSaving(false);
+    if (ok !== false) setAddModalAnchorY(null);
+    return ok;
+  }
+
   const hasSelection = !readOnly && selectedSectionIds.length > 0;
   const moveOptions = DT_SECTIONS.filter(s => s.key !== section.key);
   const firstSelectedId = selectedSectionIds.length ? selectedSectionIds[0] : null;
@@ -1359,6 +1954,15 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
     const isOpen = open.id === row.id && open.field === field;
 
     if (readOnly) {
+      return (
+        <SeeMoreText
+          value={selectedLabel}
+          fallback={field === F.reason ? 'No reason selected' : 'No instruction selected'}
+        />
+      );
+    }
+
+    if (false && readOnly) {
       if (section.key === 'deleted' && selectedLabel.trim().toLowerCase() === 'select') {
         selectedLabel = field === F.reason ? 'No reason selected' : 'No instruction selected';
       }
@@ -1437,6 +2041,15 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
     const isOpen = open.sectionKey === section.key && open.id === rowKey && open.field === field;
 
     if (readOnly) {
+      return (
+        <SeeMoreText
+          value={selectedLabel}
+          fallback={field === F.reason ? 'No reason selected' : 'No instruction selected'}
+        />
+      );
+    }
+
+    if (false && readOnly) {
       if (section.key === 'deleted' && selectedLabel.trim().toLowerCase() === 'select') {
         selectedLabel = field === F.reason ? 'No reason selected' : 'No instruction selected';
       }
@@ -1505,8 +2118,86 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
     'Creditor Name', 'Account', 'Remarks',
     'Late Payment', 'Remain Late Payment', 'Balance',
     'Status', 'Account Status',
-  ].concat(readOnly ? [] : ['Action']);
-  const columnCount = readOnly ? headers.length : headers.length + 1;
+  ];
+  const columnCount = headers.length + (readOnly ? 0 : 2);
+
+  function renderActionCell(row) {
+    if (readOnly) return null;
+
+    const isRowMoveOpen = moveRowId === row.id && moveMenuOpen;
+    const isMenuOpen = isRowMoveOpen;
+
+    return (
+      <td className="px-4 py-3 text-center relative">
+        <div className="relative" style={{ zIndex: isRowMoveOpen ? 20000 : 1 }}>
+          {!hasSelection && !isRowMoveOpen && (
+            <div className="flex items-center justify-center gap-1 transition-all duration-200">
+              <button
+                type="button"
+                title="Move to another account type"
+                onClick={(e) => openMoveForRow(row.id, e.currentTarget)}
+                className="p-1.5 rounded-full border bg-white text-sky-700 shadow-sm hover:bg-sky-50 hover:border-sky-300 hover:shadow-md transition-all cursor-pointer"
+                style={{ borderColor: '#bae6fd' }}
+              >
+                <IcMove />
+              </button>
+              <button
+                type="button"
+                title="Delete record"
+                onClick={() => handleDelete([row.id])}
+                className="p-1.5 rounded-full border bg-white hover:bg-red-50 hover:border-red-200 transition-all shadow-sm hover:shadow-md"
+                style={{ color: '#eb2525' }}
+              >
+                <IcTrash />
+              </button>
+            </div>
+          )}
+          {isRowMoveOpen && ReactDOM.createPortal(
+            <div
+              ref={moveMenuRef}
+              className="fixed transition-all duration-200"
+              style={moveMenuStyle || { position: 'fixed', width: 230, maxHeight: 260, zIndex: 2147483647 }}
+            >
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (moveMenuOpen) {
+                      setMoveMenuOpen(false);
+                      setMoveRowId(null);
+                    } else {
+                      setMoveMenuOpen(true);
+                    }
+                  }}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-xs text-left bg-white hover:bg-gray-50 active:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between transition-colors"
+                >
+                  <span className="text-gray-500">Choose Account Type</span>
+                  <span className={`ml-2 text-gray-400 transition-transform ${isMenuOpen ? 'rotate-180' : ''}`}>▼</span>
+                </button>
+                <div className={`absolute right-0 top-full mt-1 w-full rounded-lg border border-gray-200 bg-white shadow-lg overflow-hidden transition-all duration-200 origin-top-right ${isMenuOpen ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`} style={{ zIndex: 9999 }}>
+                  {moveOptions.length === 0 ? (
+                    <div className="px-3 py-2 text-xs text-gray-400">No options</div>
+                  ) : (
+                    moveOptions.map(opt => (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => handleMoveRow(row.id, opt.key)}
+                        className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                      >
+                        {opt.label}
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>,
+            document.body
+          )}
+        </div>
+      </td>
+    );
+  }
 
   return (
     <div
@@ -1663,10 +2354,35 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
           <span className="inline-block h-2 w-2 rounded-full bg-sky-500 shadow-sm" />
           {section.label}
         </span>
+        <div className="flex items-center gap-2">
         <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-500">
           {rows.length} record{rows.length !== 1 ? 's' : ''}
         </span>
+          {!readOnly && (
+            <button
+              type="button"
+              onClick={(event) => setAddModalAnchorY(event.clientY)}
+              title={`Add ${section.label}`}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-sky-100 bg-sky-50 text-sky-700 shadow-sm transition hover:border-sky-200 hover:bg-sky-100"
+            >
+              <IcPlus />
+            </button>
+          )}
+        </div>
       </div>
+
+      {addModalAnchorY != null && (
+        <AddAccountModal
+          section={section}
+          contactId={contactId}
+          anchorY={addModalAnchorY}
+          reasonOptions={reasonOptions}
+          instructionOptions={instructionOptions}
+          onClose={() => setAddModalAnchorY(null)}
+          onSave={handleAddAccount}
+          saving={addSaving}
+        />
+      )}
 
       {/* Bulk action bar — visible only when rows are selected */}
       {hasSelection && (
@@ -1777,6 +2493,11 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
                     className="w-3.5 h-3.5 rounded border-gray-300 cursor-pointer" />
                 </th>
               )}
+              {!readOnly && (
+                <th className="px-4 py-3 text-left whitespace-nowrap">
+                  Action
+                </th>
+              )}
               {headers.map((h, i) => (
                 <th
                   key={i}
@@ -1818,6 +2539,8 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
                       className="w-3.5 h-3.5 rounded border-gray-300 cursor-pointer" />
                   </td>
                 )}
+
+                {renderActionCell(row)}
 
                 {/* Reason (editable) */}
                 <td className="px-4 py-3 text-left" style={{ color: '#111827', fontWeight: 500 }}>
@@ -1973,7 +2696,7 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
                 </td>
 
                 {/* Action */}
-                {!readOnly && (
+                {false && !readOnly && (
                   <td className="px-4 py-3 text-center relative">
                     {(() => {
                       const isRowMoveOpen = moveRowId === row.id && moveMenuOpen;
@@ -2062,8 +2785,49 @@ function SectionCard({ section, rows, onDelete, onMove, onSaveRow, reasonOptions
   );
 }
 
-function InquiryTableSection({ title, rows, loading }) {
+function InquiryTableSection({ title, rows, loading, blockType, defaultTagValue = '', onAddInquiry }) {
+  const [addAnchorY, setAddAnchorY] = useDtState(null);
+  const [addSaving, setAddSaving] = useDtState(false);
+  const createEmptyInquiryForm = () => ({
+    Inquiry_ID: '',
+    Name: '',
+    Inquiry_Date: '',
+    Inquiry_Expiry_Date: '',
+    Record_ID: '',
+    Tag_Value: defaultTagValue,
+    Creditor: '',
+  });
+  const [form, setForm] = useDtState(createEmptyInquiryForm());
   const headers = ['Inquiry Name', 'Inquiry Date', 'Inquiry Expiry Date', 'Provided By'];
+  const lockedTagValue = defaultTagValue === 'started';
+  const fields = [
+    { name: 'Inquiry_ID', label: 'Inquiry ID', placeholder: 'Enter inquiry id' },
+    { name: 'Name', label: 'Client Inquiry Name', required: true, placeholder: 'Enter client inquiry name' },
+    { name: 'Inquiry_Date', label: 'Inquiry Date', required: true, placeholder: 'Enter inquiry date', type: 'date' },
+    { name: 'Inquiry_Expiry_Date', label: 'Inquiry Expiry Date', required: true, placeholder: 'Enter inquiry expiry date', type: 'date' },
+    { name: 'Record_ID', label: 'Record ID', placeholder: 'Enter record id' },
+    { name: 'Creditor', label: 'Creditor', required: true, type: 'select', placeholder: 'Select creditor', options: toChoiceOptions(ACCOUNT_CREDITOR_OPTIONS) },
+    lockedTagValue
+      ? { name: 'Tag_Value', label: 'Tag Value', required: true, readOnly: true, value: defaultTagValue }
+      : { name: 'Tag_Value', label: 'Tag Value', required: true, type: 'select', placeholder: 'Select tag value', options: toChoiceOptions(ACCOUNT_TAG_OPTIONS) },
+    { name: 'Block_Type', label: 'Block Type', required: true, readOnly: true, value: blockType },
+  ];
+
+  async function saveInquiry() {
+    if (!onAddInquiry) return;
+    setAddSaving(true);
+    const ok = await onAddInquiry({
+      ...form,
+      Block_Type: blockType,
+      Tag_Value: lockedTagValue ? defaultTagValue : form.Tag_Value,
+      Delete_flag: 'false',
+    });
+    setAddSaving(false);
+    if (ok !== false) {
+      setForm(createEmptyInquiryForm());
+      setAddAnchorY(null);
+    }
+  }
 
   return (
     <div
@@ -2081,10 +2845,36 @@ function InquiryTableSection({ title, rows, loading }) {
           <span className="inline-block h-2 w-2 rounded-full bg-sky-500 shadow-sm" />
           {title}
         </span>
-        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-500">
-          {loading ? 'Loading...' : `${rows.length} record${rows.length !== 1 ? 's' : ''}`}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-500">
+            {loading ? 'Loading...' : `${rows.length} record${rows.length !== 1 ? 's' : ''}`}
+          </span>
+          <button
+            type="button"
+            onClick={(event) => {
+              setForm(createEmptyInquiryForm());
+              setAddAnchorY(event.clientY);
+            }}
+            title={`Add ${title}`}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-sky-100 bg-sky-50 text-sky-700 shadow-sm transition hover:border-sky-200 hover:bg-sky-100"
+          >
+            <IcPlus />
+          </button>
+        </div>
       </div>
+      {addAnchorY != null && (
+        <AddBasicRecordModal
+          title={`Add ${title}`}
+          subtitle="Inquiry"
+          anchorY={addAnchorY}
+          fields={fields}
+          values={form}
+          onChange={(name, value) => setForm(prev => ({ ...prev, [name]: value }))}
+          onClose={() => setAddAnchorY(null)}
+          onSave={saveInquiry}
+          saving={addSaving}
+        />
+      )}
 
       <div className="rounded-b-xl overflow-hidden bg-white">
         <div
@@ -2152,9 +2942,32 @@ function InquiryTableSection({ title, rows, loading }) {
 }
 
 /* ─── Main exported component ─── */
-function PersonalDataTableSection({ title, fieldName, rows, loading, onDelete, readOnly = false }) {
+function PersonalDataTableSection({ title, fieldName, rows, loading, onDelete, onAddPersonalData, reasonOptions = [], instructionOptions = [], readOnly = false }) {
   const [busyId, setBusyId] = useDtState(null);
-  const headers = ['Reason', 'Instruction', fieldName, 'Creditor', 'Updated Date'].concat(readOnly ? [] : ['Action']);
+  const [addAnchorY, setAddAnchorY] = useDtState(null);
+  const [addSaving, setAddSaving] = useDtState(false);
+  const createEmptyPersonalDataForm = () => ({
+    Info_ID: '',
+    Field_Value: '',
+    Updated_Date: '',
+    Is_Deleted: 'no',
+    Creditor: '',
+    Reason: '',
+    Instruction: '',
+  });
+  const [form, setForm] = useDtState(createEmptyPersonalDataForm());
+  const headers = ['Reason', 'Instruction', fieldName, 'Creditor', 'Updated Date'];
+  const isDobField = /\bdob\b|date\s*of\s*birth/i.test(dtStr(fieldName));
+  const fields = [
+    { name: 'Info_ID', label: 'Info ID', placeholder: 'Enter info id' },
+    { name: 'Name', label: 'Field Name', required: true, readOnly: true, value: fieldName },
+    { name: 'Field_Value', label: 'Field Value', required: true, placeholder: isDobField ? 'Select date of birth' : 'Enter field value', type: isDobField ? 'date' : 'text' },
+    { name: 'Updated_Date', label: 'Updated Date', placeholder: 'Select updated date', type: 'date' },
+    { name: 'Is_Deleted', label: 'Is Deleted?', required: true, readOnly: true, value: 'no' },
+    { name: 'Creditor', label: 'Creditor', required: true, type: 'select', placeholder: 'Select creditor', options: toChoiceOptions(ACCOUNT_CREDITOR_OPTIONS) },
+    { name: 'Reason', label: 'Reason', type: 'select', placeholder: 'Select reason', options: sortOptionsAsc(reasonOptions).map(option => ({ value: option.id, label: option.label })) },
+    { name: 'Instruction', label: 'Instruction', type: 'select', placeholder: 'Select instruction', options: sortOptionsAsc(instructionOptions).map(option => ({ value: option.id, label: option.label })) },
+  ];
   const columnStyles = (readOnly ? [
     { width: '20%' },
     { width: '20%' },
@@ -2162,12 +2975,12 @@ function PersonalDataTableSection({ title, fieldName, rows, loading, onDelete, r
     { width: '16%' },
     { width: '14%' },
   ] : [
-    { width: '18%' },
-    { width: '18%' },
-    { width: '26%' },
-    { width: '16%' },
-    { width: '14%' },
     { width: '8%' },
+    { width: '18%' },
+    { width: '18%' },
+    { width: '24%' },
+    { width: '16%' },
+    { width: '16%' },
   ]);
 
   async function handleDelete(row) {
@@ -2176,6 +2989,21 @@ function PersonalDataTableSection({ title, fieldName, rows, loading, onDelete, r
     setBusyId(id);
     await onDelete(id);
     setBusyId(null);
+  }
+
+  async function savePersonalData() {
+    if (!onAddPersonalData) return;
+    setAddSaving(true);
+    const ok = await onAddPersonalData({
+      ...form,
+      Name: fieldName,
+      Delete_flag: 'false',
+    });
+    setAddSaving(false);
+    if (ok !== false) {
+      setForm(createEmptyPersonalDataForm());
+      setAddAnchorY(null);
+    }
   }
 
   return (
@@ -2194,10 +3022,38 @@ function PersonalDataTableSection({ title, fieldName, rows, loading, onDelete, r
           <span className="inline-block h-2 w-2 rounded-full bg-sky-500 shadow-sm" />
           {title}
         </span>
-        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-500">
-          {loading ? 'Loading...' : `${rows.length} record${rows.length !== 1 ? 's' : ''}`}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-500">
+            {loading ? 'Loading...' : `${rows.length} record${rows.length !== 1 ? 's' : ''}`}
+          </span>
+          {!readOnly && (
+            <button
+              type="button"
+              onClick={(event) => {
+                setForm(createEmptyPersonalDataForm());
+                setAddAnchorY(event.clientY);
+              }}
+              title={`Add ${title}`}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-sky-100 bg-sky-50 text-sky-700 shadow-sm transition hover:border-sky-200 hover:bg-sky-100"
+            >
+              <IcPlus />
+            </button>
+          )}
+        </div>
       </div>
+      {addAnchorY != null && (
+        <AddBasicRecordModal
+          title={`Add ${title}`}
+          subtitle="Personal Data"
+          anchorY={addAnchorY}
+          fields={fields}
+          values={form}
+          onChange={(name, value) => setForm(prev => ({ ...prev, [name]: value }))}
+          onClose={() => setAddAnchorY(null)}
+          onSave={savePersonalData}
+          saving={addSaving}
+        />
+      )}
 
       <div className="rounded-b-xl overflow-hidden bg-white">
         <div
@@ -2227,6 +3083,20 @@ function PersonalDataTableSection({ title, fieldName, rows, loading, onDelete, r
             </colgroup>
             <thead>
               <tr>
+                {!readOnly && (
+                  <th
+                    className="px-3 py-3 text-left"
+                    style={{
+                      maxWidth: '100%',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                    title="Action"
+                  >
+                    Action
+                  </th>
+                )}
                 {headers.map(header => (
                   <th
                     key={header}
@@ -2247,7 +3117,7 @@ function PersonalDataTableSection({ title, fieldName, rows, loading, onDelete, r
             <tbody>
               {!loading && rows.length === 0 && (
                 <tr>
-                  <td colSpan={headers.length} className="px-4 py-5 text-center text-xs text-gray-400 italic">
+                  <td colSpan={headers.length + (readOnly ? 0 : 1)} className="px-4 py-5 text-center text-xs text-gray-400 italic">
                     No records
                   </td>
                 </tr>
@@ -2256,11 +3126,33 @@ function PersonalDataTableSection({ title, fieldName, rows, loading, onDelete, r
                 const rowId = row.id || row.ID || `${title}-${index}`;
                 return (
                   <tr key={rowId}>
+                    {!readOnly && (
+                      <td className="px-3 py-3 text-center">
+                        <button
+                          type="button"
+                          disabled={busyId === rowId}
+                          onClick={() => handleDelete(row)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-red-100 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100 hover:text-red-700 disabled:opacity-50"
+                        >
+                          <IcTrash />
+                        </button>
+                      </td>
+                    )}
                     <td className="px-3 py-3 text-left" style={{ color: '#111827', fontWeight: 500, maxWidth: 0, overflowWrap: 'anywhere' }}>
-                      {dtStr(getRowValue(row, F.reason)) || '-'}
+                      <SeeMoreText
+                        value={getRowValue(row, F.reason)}
+                        fallback="No reason selected"
+                        className="text-[13px] text-gray-700"
+                        limit={60}
+                      />
                     </td>
                     <td className="px-3 py-3 text-left" style={{ color: '#111827', fontWeight: 500, maxWidth: 0, overflowWrap: 'anywhere' }}>
-                      {dtStr(getRowValue(row, F.instruction)) || '-'}
+                      <SeeMoreText
+                        value={getRowValue(row, F.instruction)}
+                        fallback="No instruction selected"
+                        className="text-[13px] text-gray-700"
+                        limit={60}
+                      />
                     </td>
                     <td className="px-3 py-3 text-left" style={{ color: '#111827', fontWeight: 500, maxWidth: 0, overflowWrap: 'anywhere' }}>
                       {dtStr(getRowValue(row, F.personalFieldValue)) || '-'}
@@ -2291,7 +3183,7 @@ function PersonalDataTableSection({ title, fieldName, rows, loading, onDelete, r
                     <td className="px-3 py-3 text-left" style={{ color: '#111827', fontWeight: 400, maxWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {dtFormatDateParts(getRowValue(row, F.personalUpdatedDate)).date}
                     </td>
-                    {!readOnly && (
+                    {false && !readOnly && (
                       <td className="px-3 py-3 text-center">
                         <button
                           type="button"
@@ -2321,10 +3213,12 @@ function CollectionTableSection({
   onDelete,
   onMove,
   onSaveRow,
+  onAddCollection,
   reasonOptions,
   instructionOptions,
   dropdownOpen,
   setDropdownOpen,
+  readOnly = false,
 }) {
   const open = dropdownOpen || { sectionKey: null, id: null, field: null, style: null };
   const [sel, setSel] = useDtState(new Set());
@@ -2337,13 +3231,56 @@ function CollectionTableSection({
   const bulkMoveRef = React.useRef(null);
   const bulkMoveButtonRef = React.useRef(null);
   const [bulkMoveMenuStyle, setBulkMoveMenuStyle] = useDtState(null);
+  const [addAnchorY, setAddAnchorY] = useDtState(null);
+  const [addSaving, setAddSaving] = useDtState(false);
+  const addBlockType = section.key === 'started' ? 'collection' : section.key;
+  const createEmptyAddForm = () => ({
+    Public_Record_ID: '',
+    Name: '',
+    Reason: '',
+    Instruction: '',
+    Agency_Status: '',
+    Agency_Balance: '',
+    creditOrBalanceValue: '',
+    Agency_Remark: '',
+    Original_Creditor: '',
+    Opened_Date: '',
+    Dispute_Status: '',
+    Display_Status: '',
+    Creditor: '',
+    Tag_Value: section.key === 'started' ? 'started' : '',
+    Rental_Reason: '',
+    Rental_Instruction: '',
+  });
+  const [addForm, setAddForm] = useDtState(createEmptyAddForm());
   const moveOptions = COLLECTION_MOVE_OPTIONS.filter(opt => opt.key !== section.key);
+  const addFields = [
+    { name: 'Public_Record_ID', label: 'Public Record ID', placeholder: 'Enter public record id' },
+    { name: 'Name', label: 'Agency Name', required: true, placeholder: 'Enter agency name' },
+    { name: 'Reason', label: 'Reason', type: 'select', placeholder: 'Select reason', options: sortOptionsAsc(reasonOptions).map(option => ({ value: option.id, label: option.label })) },
+    { name: 'Instruction', label: 'Instruction', type: 'select', placeholder: 'Select instruction', options: sortOptionsAsc(instructionOptions).map(option => ({ value: option.id, label: option.label })) },
+    { name: 'Agency_Status', label: 'Agency Status', placeholder: 'Enter agency status' },
+    { name: 'Agency_Balance', label: 'Agency Balance', placeholder: 'Enter agency balance' },
+    { name: 'creditOrBalanceValue', label: 'Credit Or Balance Value', placeholder: 'Enter credit or balance value' },
+    { name: 'Agency_Remark', label: 'Agency Remark', placeholder: 'Enter agency remark' },
+    { name: 'Original_Creditor', label: 'Original Creditor', required: true, placeholder: 'Enter original creditor' },
+    { name: 'Opened_Date', label: 'Opened Date', placeholder: 'Select opened date', type: 'datetime-local' },
+    { name: 'Dispute_Status', label: 'Dispute Status', type: 'select', placeholder: 'Select dispute status', options: toChoiceOptions(['Initial', 'New', 'Completed']) },
+    { name: 'Display_Status', label: 'Display Status', type: 'select', placeholder: 'Select display status', options: toChoiceOptions(['New', 'In-progress', 'Close']) },
+    { name: 'Creditor', label: 'Creditor', required: true, type: 'select', placeholder: 'Select creditor', options: toChoiceOptions(ACCOUNT_CREDITOR_OPTIONS) },
+    { name: 'Block_Type', label: 'Block Type', required: true, readOnly: true, value: addBlockType },
+    section.key === 'started'
+      ? { name: 'Tag_Value', label: 'Tag Value', readOnly: true, value: 'started' }
+      : { name: 'Tag_Value', label: 'Tag Value', type: 'select', placeholder: 'Select tag value', options: toChoiceOptions(['started', 'not-started']) },
+    { name: 'Rental_Reason', label: 'Rental Reason', placeholder: 'Enter rental reason', type: 'textarea' },
+    { name: 'Rental_Instruction', label: 'Rental Instruction', placeholder: 'Enter rental instruction', type: 'textarea' },
+  ];
   const headers = [
     'Reason', 'Instruction', 'Rental Reason', 'Rental Instruction','Collection Agency', 'Balance',
     'Status', 'Creditor', 'Original Creditor',
-    'Opened Date', 'Action',
+    'Opened Date',
   ];
-  const allChecked = rows.length > 0 && rows.every(r => sel.has(r.id || r.ID));
+  const allChecked = !readOnly && rows.length > 0 && rows.every(r => sel.has(r.id || r.ID));
 
   useDtEffect(() => {
     setSel(new Set());
@@ -2355,6 +3292,7 @@ function CollectionTableSection({
   }, [rows]);
 
   function toggleAll() {
+    if (readOnly) return;
     const next = allChecked ? new Set() : new Set(rows.map(r => r.id || r.ID).filter(Boolean));
     setSel(next);
     setBulkMoveOpen(false);
@@ -2362,6 +3300,7 @@ function CollectionTableSection({
   }
 
   function toggleRow(id) {
+    if (readOnly) return;
     if (!id) return;
     setSel(prev => {
       const next = new Set(prev);
@@ -2370,6 +3309,22 @@ function CollectionTableSection({
       setBulkMoveMenuStyle(null);
       return next;
     });
+  }
+
+  async function saveCollection() {
+    if (!onAddCollection) return;
+    setAddSaving(true);
+    const ok = await onAddCollection(section, {
+      ...addForm,
+      Block_Type: addBlockType,
+      ...(section.key === 'started' ? { Tag_Value: 'started' } : {}),
+      Delete_flag: 'false',
+    });
+    setAddSaving(false);
+    if (ok !== false) {
+      setAddForm(createEmptyAddForm());
+      setAddAnchorY(null);
+    }
   }
 
   useDtEffect(() => {
@@ -2519,6 +3474,15 @@ function CollectionTableSection({
     const key = rowKey(row);
     const isOpen = open.sectionKey === section.key && open.id === key && open.field === field;
 
+    if (readOnly) {
+      return (
+        <SeeMoreText
+          value={selectedLabel}
+          fallback={field === F.reason ? 'No reason selected' : 'No instruction selected'}
+        />
+      );
+    }
+
     const menu = isOpen ? (
       <div
         className="fixed rounded-xl border bg-white shadow-2xl overflow-hidden"
@@ -2640,12 +3604,40 @@ function CollectionTableSection({
           <span className="inline-block h-2 w-2 rounded-full bg-sky-500 shadow-sm" />
           {section.label}
         </span>
-        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-500">
-          {loading ? 'Loading...' : `${rows.length} record${rows.length !== 1 ? 's' : ''}`}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-500">
+            {loading ? 'Loading...' : `${rows.length} record${rows.length !== 1 ? 's' : ''}`}
+          </span>
+          {!readOnly && (
+            <button
+              type="button"
+              onClick={(event) => {
+                setAddForm(createEmptyAddForm());
+                setAddAnchorY(event.clientY);
+              }}
+              title={`Add ${section.label}`}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-sky-100 bg-sky-50 text-sky-700 shadow-sm transition hover:border-sky-200 hover:bg-sky-100"
+            >
+              <IcPlus />
+            </button>
+          )}
+        </div>
       </div>
+      {addAnchorY != null && (
+        <AddBasicRecordModal
+          title={`Add ${section.label}`}
+          subtitle="Collection"
+          anchorY={addAnchorY}
+          fields={addFields}
+          values={addForm}
+          onChange={(name, value) => setAddForm(prev => ({ ...prev, [name]: value }))}
+          onClose={() => setAddAnchorY(null)}
+          onSave={saveCollection}
+          saving={addSaving}
+        />
+      )}
 
-      {sel.size > 0 && (
+      {!readOnly && sel.size > 0 && (
         <div className="px-4 py-2 bg-blue-50 border-b border-blue-100 flex items-center gap-5 relative" style={{ zIndex: 2147483645, overflow: 'visible' }}>
           {!bulkMoveOpen ? (
             <button
@@ -2724,14 +3716,21 @@ function CollectionTableSection({
           >
             <thead>
               <tr>
-                <th className="px-4 py-3 w-8 text-left">
-                  <input
-                    type="checkbox"
-                    checked={allChecked}
-                    onChange={toggleAll}
-                    className="w-3.5 h-3.5 rounded border-gray-300 cursor-pointer"
-                  />
-                </th>
+                {!readOnly && (
+                  <th className="px-4 py-3 w-8 text-left">
+                    <input
+                      type="checkbox"
+                      checked={allChecked}
+                      onChange={toggleAll}
+                      className="w-3.5 h-3.5 rounded border-gray-300 cursor-pointer"
+                    />
+                  </th>
+                )}
+                {!readOnly && (
+                  <th className="px-4 py-3 text-left whitespace-nowrap">
+                    Action
+                  </th>
+                )}
                 {headers.map(header => (
                   <th key={header} className="px-4 py-3 text-left whitespace-nowrap">
                     {header}
@@ -2742,7 +3741,7 @@ function CollectionTableSection({
             <tbody>
               {!loading && rows.length === 0 && (
                 <tr>
-                  <td colSpan={headers.length + 1} className="px-4 py-5 text-center text-xs text-gray-400 italic">
+                  <td colSpan={headers.length + (readOnly ? 0 : 2)} className="px-4 py-5 text-center text-xs text-gray-400 italic">
                     No records
                   </td>
                 </tr>
@@ -2760,14 +3759,75 @@ function CollectionTableSection({
                         : 'transparent',
                     }}
                   >
-                    <td className="px-4 py-3 text-center">
-                      <input
-                        type="checkbox"
-                        checked={!!id && sel.has(id)}
-                        onChange={() => toggleRow(id)}
-                        className="w-3.5 h-3.5 rounded border-gray-300 cursor-pointer"
-                      />
+                    {!readOnly && (
+                      <td className="px-4 py-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={!!id && sel.has(id)}
+                          onChange={() => toggleRow(id)}
+                          className="w-3.5 h-3.5 rounded border-gray-300 cursor-pointer"
+                        />
+                      </td>
+                    )}
+                    {!readOnly && (
+                    <td className="px-4 py-3 text-center relative">
+                      {sel.size === 0 && (
+                        isRowMoveOpen ? (
+                          <div ref={moveMenuRef} className="relative inline-block w-44 text-left" style={{ zIndex: 20000 }}>
+                            <div className="rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMoveMenuOpen(false);
+                                  setMoveRowId(null);
+                                  setMoveMenuStyle(null);
+                                }}
+                                className="w-full border-b border-slate-200 px-3 py-2 text-xs text-left bg-white hover:bg-slate-50 flex items-center justify-between"
+                              >
+                                <span className="text-slate-600">Choose Type</span>
+                                <span className="ml-2 text-gray-400 rotate-180">▼</span>
+                              </button>
+                              <div className="max-h-48 overflow-y-auto p-1.5 space-y-1">
+                                {moveOptions.length === 0 ? (
+                                  <div className="px-3 py-2 text-xs text-gray-400">No options</div>
+                                ) : (
+                                  moveOptions.map(opt => (
+                                    <button
+                                      key={opt.key}
+                                      type="button"
+                                      onClick={() => handleMoveRow(id, opt.key)}
+                                      className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 rounded-md"
+                                    >
+                                      {opt.label}
+                                    </button>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center gap-2" style={{ zIndex: 20000 }}>
+                            <button
+                              type="button"
+                              disabled={busy || !id}
+                              onClick={(e) => openMoveForRow(id, e.currentTarget)}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50 shadow-sm"
+                            >
+                              <IcMove />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy || !id}
+                              onClick={() => handleDeleteRow(id)}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-red-100 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-100 hover:text-red-700 disabled:opacity-50"
+                            >
+                              <IcTrash />
+                            </button>
+                          </div>
+                        )
+                      )}
                     </td>
+                    )}
                     <td className="px-4 py-3 text-left">{renderDropdown(row, F.reason, reasonOptions)}</td>
                     <td className="px-4 py-3 text-left">{renderDropdown(row, F.instruction, instructionOptions)}</td>
                      <td className="px-4 py-3 text-left" style={{ minWidth: 180 }}>
@@ -2810,6 +3870,7 @@ function CollectionTableSection({
                     <td className="px-4 py-3 text-left whitespace-nowrap">
                       {dtFormatDateParts(getRowValue(row, F.collectionOpenedDate)).date}
                     </td>
+                    {false && !readOnly && (
                     <td className="px-4 py-3 text-center relative">
                       {sel.size === 0 && (
                         isRowMoveOpen ? (
@@ -2867,6 +3928,7 @@ function CollectionTableSection({
                         )
                       )}
                     </td>
+                    )}
                   </tr>
                 );
               })}
@@ -2878,7 +3940,7 @@ function CollectionTableSection({
   );
 }
 
-function AccountsDetailTable({ contactId, accounts: propAccounts, entityName, bulkControlsTargetId }) {
+function AccountsDetailTable({ contactId, accounts: propAccounts, entityName, refreshKey = 0, bulkControlsTargetId, bulkActionsTargetId }) {
   const [accounts, setAccounts] = useDtState(propAccounts || []);
   const [deletedAccounts, setDeletedAccounts] = useDtState([]);
   const [inquiryTables, setInquiryTables] = useDtState({ new: [], inquiry: [], started: [] });
@@ -2894,7 +3956,6 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName, bu
   const [dropdownOpen, setDropdownOpen] = useDtState({ sectionKey: null, id: null, field: null, style: null });
   const [collectionDropdownOpen, setCollectionDropdownOpen] = useDtState({ sectionKey: null, id: null, field: null, style: null });
   const [selectedAccountIds, setSelectedAccountIds] = useDtState(new Set());
-  const [bulkBusy, setBulkBusy] = useDtState(false);
 
   useDtEffect(() => {
     const active = (propAccounts || []).filter(r => !isDisplayDeleted(r));
@@ -2971,7 +4032,7 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName, bu
     return () => {
       alive = false;
     };
-  }, [contactId]);
+  }, [contactId, refreshKey]);
 
   useDtEffect(() => {
     let alive = true;
@@ -3069,18 +4130,42 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName, bu
     setDeletedAccounts(deleted);
   }
 
+  function resetLocalAccountReasonInstruction() {
+    const originalById = new Map((propAccounts || []).map(row => [String(row.id || row.ID), row]));
+    setAccounts(prev => prev.map(row => {
+      const original = originalById.get(String(row.id || row.ID));
+      if (!original) return row;
+      return {
+        ...row,
+        [F.reason]: getRowValue(original, F.reason),
+        [F.instruction]: getRowValue(original, F.instruction),
+      };
+    }));
+  }
+
   async function handleDelete(ids) {
     if (!ids.length) return;
+    const idSet = new Set(ids.map(String));
     try {
       await Promise.all(ids.map(id =>
         ZOHO.CRM.API.updateRecord({
           Entity: 'Client_Account',
           RecordID: id,
-          APIData: { id, Delete_flag: 'true' },
+          APIData: { id, [F.blockType]: 'removed', [F.acctStatus]: 'Deleted' },
         })
       ));
-      setAccounts(prev => prev.filter(r => !ids.includes(r.id)));
-      setDeletedAccounts(prev => prev.filter(r => !ids.includes(r.id)));
+      const deletedRows = accounts
+        .filter(row => idSet.has(String(row.id)))
+        .map(row => ({
+          ...row,
+          [F.blockType]: 'removed',
+          [F.acctStatus]: 'Deleted',
+        }));
+      setAccounts(prev => prev.filter(row => !idSet.has(String(row.id))));
+      setDeletedAccounts(prev => [
+        ...deletedRows,
+        ...prev.filter(row => !idSet.has(String(row.id))),
+      ]);
     } catch (e) { console.warn('delete error', e); }
   }
 
@@ -3090,9 +4175,13 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName, bu
       await ZOHO.CRM.API.updateRecord({
         Entity: 'Personal_Data',
         RecordID: id,
-        APIData: { id, Delete_flag: 'true' },
+        APIData: { id, [F.personalIsDeleted]: 'Yes' },
       });
-      setPersonalDataRows(prev => prev.filter(row => String(row.id || row.ID) !== String(id)));
+      setPersonalDataRows(prev => prev.map(row =>
+        String(row.id || row.ID) === String(id)
+          ? { ...row, [F.personalIsDeleted]: 'Yes' }
+          : row
+      ));
     } catch (e) {
       console.warn('personal data delete error', e);
     }
@@ -3122,7 +4211,7 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName, bu
       await ZOHO.CRM.API.updateRecord({
         Entity: 'Collection',
         RecordID: id,
-        APIData: { id, Delete_flag: 'true' },
+        APIData: { id, [F.collectionBlockType]: 'removed', [F.collectionDisplayStatus]: 'Closed', [F.tagValue]: '' },
       });
       await refreshCollections();
     } catch (e) {
@@ -3136,7 +4225,12 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName, bu
       await ZOHO.CRM.API.updateRecord({
         Entity: 'Collection',
         RecordID: id,
-        APIData: { id, [F.collectionBlockType]: targetType, [F.tagValue]: '' },
+        APIData: {
+          id,
+          [F.collectionBlockType]: targetType,
+          ...(targetType === 'removed' ? { [F.collectionDisplayStatus]: 'Closed' } : {}),
+          [F.tagValue]: '',
+        },
       });
       await refreshCollections();
     } catch (e) {
@@ -3158,17 +4252,134 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName, bu
     }
   }
 
+  async function handleAddCollection(section, values) {
+    if (!window.ZOHO || !ZOHO.CRM || !ZOHO.CRM.API || !ZOHO.CRM.API.insertRecord) {
+      console.warn('[CF] Collection insertRecord is not available.');
+      return false;
+    }
+
+    const apiData = Object.entries(values).reduce((next, [key, value]) => {
+      if (['Client', 'Delete_flag', 'Reason', 'Instruction'].includes(key)) return next;
+      const normalized = dtStr(value).trim();
+      if (normalized) next[key] = normalized;
+      return next;
+    }, {
+      Block_Type: dtStr(values.Block_Type) || section.key,
+      Delete_flag: 'false',
+      ...(contactId ? { Client: { id: contactId } } : {}),
+    });
+    if (values.Reason) apiData[F.reason] = { id: values.Reason };
+    if (values.Instruction) apiData[F.instruction] = { id: values.Instruction };
+
+    try {
+      const resp = await ZOHO.CRM.API.insertRecord({
+        Entity: 'Collection',
+        APIData: apiData,
+        Trigger: ['workflow'],
+      });
+      console.log('[CF] Collection add response:', resp);
+      const createdId = resp && resp.data && resp.data[0] && resp.data[0].details && resp.data[0].details.id;
+      setCollectionRows(prev => [{ ...apiData, id: createdId || `local-collection-${Date.now()}` }, ...prev]);
+      window.OverviewWidget && window.OverviewWidget.requestResize && window.OverviewWidget.requestResize();
+      return true;
+    } catch (error) {
+      console.warn('[CF] Collection add failed:', error, apiData);
+      return false;
+    }
+  }
+
+  async function handleAddInquiry(values) {
+    if (!window.ZOHO || !ZOHO.CRM || !ZOHO.CRM.API || !ZOHO.CRM.API.insertRecord) {
+      console.warn('[CF] Inquiries insertRecord is not available.');
+      return false;
+    }
+
+    const apiData = Object.entries(values).reduce((next, [key, value]) => {
+      if (['Client', 'Delete_flag'].includes(key)) return next;
+      const normalized = dtStr(value).trim();
+      if (normalized) next[key] = normalized;
+      return next;
+    }, {
+      Delete_flag: 'false',
+      ...(contactId ? { Client: { id: contactId } } : {}),
+    });
+
+    try {
+      const resp = await ZOHO.CRM.API.insertRecord({
+        Entity: 'Inquiries',
+        APIData: apiData,
+        Trigger: ['workflow'],
+      });
+      console.log('[CF] Inquiry add response:', resp);
+      const createdId = resp && resp.data && resp.data[0] && resp.data[0].details && resp.data[0].details.id;
+      const newRow = { ...apiData, id: createdId || `local-inquiry-${Date.now()}` };
+      setInquiryTables(prev => {
+        const next = { ...prev };
+        const key = dtStr(apiData.Tag_Value).toLowerCase() === 'started'
+          ? 'started'
+          : (apiData.Block_Type === 'new' ? 'new' : 'inquiry');
+        next[key] = [newRow, ...(next[key] || [])];
+        return next;
+      });
+      window.OverviewWidget && window.OverviewWidget.requestResize && window.OverviewWidget.requestResize();
+      return true;
+    } catch (error) {
+      console.warn('[CF] Inquiry add failed:', error, apiData);
+      return false;
+    }
+  }
+
+  async function handleAddPersonalData(values) {
+    if (!window.ZOHO || !ZOHO.CRM || !ZOHO.CRM.API || !ZOHO.CRM.API.insertRecord) {
+      console.warn('[CF] Personal_Data insertRecord is not available.');
+      return false;
+    }
+
+    const apiData = Object.entries(values).reduce((next, [key, value]) => {
+      if (['Client', 'Delete_flag', 'Reason', 'Instruction'].includes(key)) return next;
+      const normalized = dtStr(value).trim();
+      if (normalized) next[key] = normalized;
+      return next;
+    }, {
+      Delete_flag: 'false',
+      ...(contactId ? { Client: { id: contactId } } : {}),
+    });
+    if (values.Reason) apiData.Reason = { id: values.Reason };
+    if (values.Instruction) apiData.Instruction = { id: values.Instruction };
+
+    try {
+      const resp = await ZOHO.CRM.API.insertRecord({
+        Entity: 'Personal_Data',
+        APIData: apiData,
+        Trigger: ['workflow'],
+      });
+      console.log('[CF] Personal_Data add response:', resp);
+      const createdId = resp && resp.data && resp.data[0] && resp.data[0].details && resp.data[0].details.id;
+      setPersonalDataRows(prev => [{ ...apiData, id: createdId || `local-personal-${Date.now()}` }, ...prev]);
+      window.OverviewWidget && window.OverviewWidget.requestResize && window.OverviewWidget.requestResize();
+      return true;
+    } catch (error) {
+      console.warn('[CF] Personal_Data add failed:', error, apiData);
+      return false;
+    }
+  }
+
   async function handleMove(ids, targetType) {
     if (!ids.length) return;
+    const apiDataForMove = (id) => ({
+      id,
+      [F.blockType]: targetType,
+      ...(targetType === 'removed' ? { [F.acctStatus]: 'Deleted' } : {}),
+    });
     try {
       await Promise.all(ids.map(id =>
         ZOHO.CRM.API.updateRecord({
           Entity: 'Client_Account',
           RecordID: id,
-          APIData: { id, [F.blockType]: targetType },
+          APIData: apiDataForMove(id),
         })
       ));
-      setAccounts(prev => prev.map(r => ids.includes(r.id) ? { ...r, [F.blockType]: targetType } : r));
+      setAccounts(prev => prev.map(r => ids.includes(r.id) ? { ...r, ...apiDataForMove(r.id) } : r));
     } catch (e) { console.warn('move error', e); }
   }
 
@@ -3196,6 +4407,54 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName, bu
     } catch (e) { console.warn('save error', e); }
   }
 
+  async function handleAddAccount(section, values) {
+    if (!window.ZOHO || !ZOHO.CRM || !ZOHO.CRM.API || !ZOHO.CRM.API.insertRecord) {
+      console.warn('[CF] Client_Account insertRecord is not available.');
+      return false;
+    }
+
+    const apiData = Object.entries(values).reduce((next, [key, value]) => {
+      if (['Client_ID', 'Block_Type', 'Delete_flag', 'Reason', 'Instruction'].includes(key)) return next;
+      const normalized = dtStr(value).trim();
+      if (normalized) next[key] = normalized;
+      return next;
+    }, {
+      Block_Type: section.key,
+      Delete_flag: 'false',
+      ...(contactId ? { Client_ID: { id: contactId } } : {}),
+    });
+    if (values.Reason) apiData[F.reason] = { id: values.Reason };
+    if (values.Instruction) apiData[F.instruction] = { id: values.Instruction };
+
+    try {
+      const resp = await ZOHO.CRM.API.insertRecord({
+        Entity: 'Client_Account',
+        APIData: apiData,
+        Trigger: ['workflow'],
+      });
+      console.log('[CF] Client_Account add response:', resp);
+
+      const createdId = resp && resp.data && resp.data[0] && resp.data[0].details && resp.data[0].details.id;
+      const newRow = {
+        ...apiData,
+        id: createdId || `local-${Date.now()}`,
+        [F.date]: new Date().toISOString(),
+      };
+
+      if (isDisplayDeleted(newRow)) {
+        setDeletedAccounts(prev => [newRow, ...prev]);
+      } else {
+        setAccounts(prev => [newRow, ...prev]);
+      }
+
+      window.OverviewWidget && window.OverviewWidget.requestResize && window.OverviewWidget.requestResize();
+      return true;
+    } catch (error) {
+      console.warn('[CF] Client_Account add failed:', error, apiData);
+      return false;
+    }
+  }
+
   function toggleBulkAll(checked) {
     setSelectedAccountIds(checked ? new Set(accounts.map(row => row.id)) : new Set());
   }
@@ -3215,79 +4474,38 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName, bu
     });
   }
 
-  async function handleBulkApply(field, optionId) {
-    const ids = Array.from(selectedAccountIds);
-    if (!ids.length || !optionId || bulkBusy) return;
-    const idSet = new Set(ids);
-
-    setBulkBusy(true);
-    try {
-      await Promise.all(ids.map(id =>
-        ZOHO.CRM.API.updateRecord({
-          Entity: 'Client_Account',
-          RecordID: id,
-          APIData: { id, [field]: { id: optionId } },
-        })
-      ));
-
-      const label = field === F.reason
-        ? optionLabel(reasonOptions, optionId)
-        : optionLabel(instructionOptions, optionId);
-
-      setAccounts(prev => prev.map(row => {
-        if (!idSet.has(row.id)) return row;
-        return {
-          ...row,
-          [field]: { id: optionId, name: label },
-        };
-      }));
-    } catch (e) {
-      console.warn('bulk save error', e);
-    } finally {
-      setBulkBusy(false);
-      window.OverviewWidget && window.OverviewWidget.requestResize && window.OverviewWidget.requestResize();
-    }
+  function applyBulkAccountField(field, value) {
+    setAccounts(prev => prev.map(row => ({
+      ...row,
+      [field]: value,
+    })));
   }
 
-  async function handleCreateMasterOption(type, value) {
-    if (!value || bulkBusy || !window.ZOHO || !ZOHO.CRM || !ZOHO.CRM.API || !ZOHO.CRM.API.insertRecord) return null;
-    setBulkBusy(true);
-    try {
-      const resp = await ZOHO.CRM.API.insertRecord({
-        Entity: 'Master_Reason_Instruction',
-        APIData: {
-          Name: value,
-          Type: type,
-          Type_of_information: 'Account',
-          Status_Active: true,
-        },
-        Trigger: ['workflow'],
-      });
-
-      const createdId = resp && resp.data && resp.data[0] && resp.data[0].details && resp.data[0].details.id;
-      const option = { id: createdId || value, label: value };
-
-      if (type === 'Reason') {
-        setReasonOptions(prev => upsertSortedOption(prev, option));
-      } else {
-        setInstructionOptions(prev => upsertSortedOption(prev, option));
-      }
-
-      return option;
-    } catch (e) {
-      console.warn('create master option error', e);
-      return null;
-    } finally {
-      setBulkBusy(false);
-      window.OverviewWidget && window.OverviewWidget.requestResize && window.OverviewWidget.requestResize();
+  function applyBulkReason(value, options = {}) {
+    if (options.custom) {
+      applyBulkAccountField(F.reason, dtStr(value));
+      return;
     }
+
+    const label = optionLabel(reasonOptions, value);
+    applyBulkAccountField(F.reason, value ? { id: value, name: label } : '');
+  }
+
+  function applyBulkInstruction(value, options = {}) {
+    if (options.custom) {
+      applyBulkAccountField(F.instruction, dtStr(value));
+      return;
+    }
+
+    const label = optionLabel(instructionOptions, value);
+    applyBulkAccountField(F.instruction, value ? { id: value, name: label } : '');
   }
 
   /* Group by block_type */
   const grouped = Object.fromEntries(DT_SECTIONS.map(s => [s.key, []]));
-  accounts.forEach(acc => {
+  [...accounts, ...deletedAccounts].forEach(acc => {
     const rawKey = acc[F.blockType] || acc.block_type || acc.Block_Type || acc.BlockType;
-    const key = dtStr(rawKey).trim().toLowerCase();
+    const key = isDisplayDeleted(acc) ? 'removed' : dtStr(rawKey).trim().toLowerCase();
     if (grouped[key]) grouped[key].push(acc);
   });
 
@@ -3298,18 +4516,23 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName, bu
     personalDataRows.filter(row => isPicklistYes(getRowValue(row, F.personalIsDeleted)))
   );
   const groupedCollections = groupCollectionRows(collectionRows);
-  const visibleCollectionSections = COLLECTION_SECTIONS.filter(section => (groupedCollections[section.key] || []).length > 0);
+  const visibleCollectionSections = COLLECTION_SECTIONS;
   const bulkControls = (
     <AccountBulkControls
       accounts={accounts}
       selectedIds={selectedAccountIds}
+      actionsTargetId={bulkActionsTargetId}
+      onResetLocal={() => {
+        resetLocalAccountReasonInstruction();
+        setSelectedAccountIds(new Set());
+      }}
       onToggleAll={toggleBulkAll}
       onToggleBureau={toggleBulkBureau}
       reasonOptions={reasonOptions}
       instructionOptions={instructionOptions}
-      onBulkApply={handleBulkApply}
-      onCreateMasterOption={handleCreateMasterOption}
-      busy={bulkBusy}
+      onApplyReason={applyBulkReason}
+      onApplyInstruction={applyBulkInstruction}
+      busy={false}
     />
   );
   const bulkControlsTarget = bulkControlsTargetId && typeof document !== 'undefined'
@@ -3329,60 +4552,15 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName, bu
           onDelete={handleDelete}
           onMove={handleMove}
           onSaveRow={handleSaveRow}
+          onAddAccount={handleAddAccount}
+          contactId={contactId}
           reasonOptions={reasonOptions}
           instructionOptions={instructionOptions}
           dropdownOpen={dropdownOpen}
           setDropdownOpen={setDropdownOpen}
+          readOnly={section.key === 'removed'}
           selectedIds={selectedAccountIds}
           onSelectionChange={setSelectedAccountIds}
-        />
-      ))}
-      <SectionCard
-        section={{ key: 'deleted', label: 'Deleted Accounts' }}
-        rows={deletedAccounts}
-        onDelete={handleDelete}
-        onMove={handleMove}
-        onSaveRow={handleSaveRow}
-        reasonOptions={reasonOptions}
-        instructionOptions={instructionOptions}
-        dropdownOpen={dropdownOpen}
-        setDropdownOpen={setDropdownOpen}
-        readOnly={true}
-      />
-      <InquiryTableSection
-        title="New Inquiries"
-        rows={inquiryTables.new}
-        loading={inquiriesLoading}
-      />
-      <InquiryTableSection
-        title="Inquiries"
-        rows={inquiryTables.inquiry}
-        loading={inquiriesLoading}
-      />
-      <InquiryTableSection
-        title="Started Inquiries"
-        rows={inquiryTables.started}
-        loading={inquiriesLoading}
-      />
-      {activePersonalDataGroups.map(group => (
-        <PersonalDataTableSection
-          key={`personal-${group.name}`}
-          title={`Personal Data(${group.name})`}
-          fieldName={group.name}
-          rows={group.rows}
-          loading={personalDataLoading}
-          onDelete={handlePersonalDataDelete}
-        />
-      ))}
-      {deletedPersonalDataGroups.map(group => (
-        <PersonalDataTableSection
-          key={`deleted-personal-${group.name}`}
-          title={`Deleted Personal Data(${group.name})`}
-          fieldName={group.name}
-          rows={group.rows}
-          loading={personalDataLoading}
-          onDelete={handlePersonalDataDelete}
-          readOnly={true}
         />
       ))}
       {visibleCollectionSections.map(section => (
@@ -3394,10 +4572,60 @@ function AccountsDetailTable({ contactId, accounts: propAccounts, entityName, bu
           onDelete={handleCollectionDelete}
           onMove={handleCollectionMove}
           onSaveRow={handleCollectionSaveRow}
+          onAddCollection={handleAddCollection}
           reasonOptions={collectionReasonOptions}
           instructionOptions={collectionInstructionOptions}
           dropdownOpen={collectionDropdownOpen}
           setDropdownOpen={setCollectionDropdownOpen}
+          readOnly={section.key === 'removed'}
+        />
+      ))}
+      <InquiryTableSection
+        title="New Inquiries"
+        rows={inquiryTables.new}
+        loading={inquiriesLoading}
+        blockType="new"
+        defaultTagValue="not-started"
+        onAddInquiry={handleAddInquiry}
+      />
+      <InquiryTableSection
+        title="Inquiries"
+        rows={inquiryTables.inquiry}
+        loading={inquiriesLoading}
+        blockType="inquiry"
+        defaultTagValue="not-started"
+        onAddInquiry={handleAddInquiry}
+      />
+      <InquiryTableSection
+        title="Started Inquiries"
+        rows={inquiryTables.started}
+        loading={inquiriesLoading}
+        blockType="inquiry"
+        defaultTagValue="started"
+        onAddInquiry={handleAddInquiry}
+      />
+      {activePersonalDataGroups.map(group => (
+        <PersonalDataTableSection
+          key={`personal-${group.name}`}
+          title={`Personal Data(${group.name})`}
+          fieldName={group.name}
+          rows={group.rows}
+          loading={personalDataLoading}
+          onDelete={handlePersonalDataDelete}
+          onAddPersonalData={handleAddPersonalData}
+          reasonOptions={reasonOptions}
+          instructionOptions={instructionOptions}
+        />
+      ))}
+      {deletedPersonalDataGroups.map(group => (
+        <PersonalDataTableSection
+          key={`deleted-personal-${group.name}`}
+          title={`Deleted Personal Data(${group.name})`}
+          fieldName={group.name}
+          rows={group.rows}
+          loading={personalDataLoading}
+          onDelete={handlePersonalDataDelete}
+          readOnly={true}
         />
       ))}
     </div>

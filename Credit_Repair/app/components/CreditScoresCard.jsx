@@ -188,15 +188,17 @@ async function fetchLatestCreditScores(clientId) {
 function ScoreCol({ name, score, max, logoSrc }) {
   const logoClass = name === 'Experian'
     ? 'h-9 w-auto max-w-[150px] object-contain'
-    : 'h-7 w-auto max-w-[150px] object-contain';
+    : name === 'TransUnion'
+      ? 'h-8 w-auto max-w-[170px] object-contain'
+      : 'h-7 w-auto max-w-[150px] object-contain';
 
   return (
-    <div className="flex h-full w-full min-w-0 flex-col items-center text-center">
-      <div className="flex h-10 w-full items-center justify-center">
+    <div className="flex h-full w-full min-w-0 flex-col items-center overflow-visible text-center">
+      <div className="flex h-12 w-full items-center justify-center overflow-visible px-2">
         <img src={logoSrc} alt={name} className={logoClass} />
       </div>
-      <div className="flex h-[118px] w-full items-center justify-center">
-        <div className="h-[108px] w-[164px] max-w-full">
+      <div className="flex h-[112px] w-full items-center justify-center">
+        <div className="h-[102px] w-[148px] max-w-full">
           <SpeedometerGauge score={score} max={max} uid={name} />
         </div>
       </div>
@@ -242,19 +244,19 @@ function CreditScoresCard({ record, contactId }) {
 
   const cols = [
     { name: 'Equifax', score: toCreditScore(scores.Equifax), logoSrc: './assets/equifax-logo.svg' },
-    { name: 'Experian', score: toCreditScore(scores.Experian), logoSrc: './assets/experian-logo.svg' },
     { name: 'TransUnion', score: toCreditScore(scores.TransUnion), logoSrc: './assets/transunion-logo.svg' },
+    { name: 'Experian', score: toCreditScore(scores.Experian), logoSrc: './assets/experian-logo.svg' },
   ];
 
   return (
-    <div className="cf-glass bg-white rounded-xl border border-gray-200 shadow-sm w-full min-h-[205px] px-4 py-3">
+    <div className="cf-glass bg-white rounded-xl border border-gray-200 shadow-sm w-full min-h-[198px] px-4 py-3">
       {(loading || error) && (
         <div className="mb-3 flex justify-end">
           {loading && <span className="text-xs text-gray-400">Loading...</span>}
           {!loading && error && <span className="text-xs text-red-500">{error}</span>}
         </div>
       )}
-      <div className="grid min-h-[179px] grid-cols-1 content-center gap-2 sm:grid-cols-3">
+      <div className="grid min-h-[172px] grid-cols-1 content-center gap-2 sm:grid-cols-3">
         {cols.map((c) => (
           <div key={c.name} className="py-1 first:pt-0 last:pb-0 sm:flex sm:px-2 sm:py-0">
             <ScoreCol {...c} max={MAX} />

@@ -14,10 +14,7 @@ function Svg({ size = 16, className = '', children }) {
 }
 
 const EditIcon  = (p) => <Svg {...p}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></Svg>;
-const EmailIcon = (p) => <Svg {...p}><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></Svg>;
-const SmsIcon   = (p) => <Svg {...p}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></Svg>;
 const CheckIcon = (p) => <Svg {...p}><polyline points="20 6 9 17 4 12"/></Svg>;
-const XIcon     = (p) => <Svg {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></Svg>;
 
 /* ═══════════════════════════════════════════
    CACHE — stale-while-revalidate via localStorage
@@ -157,14 +154,14 @@ function DisplayRow({ label, value, bold = false }) {
 
 function EditRow({ label, field, value, type = 'text', autoFocus = false, onChange }) {
   return (
-    <div className="flex items-center gap-4 py-2">
+    <div className="flex items-center gap-4 py-1.5">
       <span className="text-sm text-gray-500 shrink-0 w-28">{label}</span>
       <input
         type={type}
         value={value}
         autoFocus={autoFocus}
         onChange={e => onChange(field, e.target.value)}
-        className="flex-1 text-sm text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-violet-400 transition-all"
+        className="min-w-0 flex-1 text-sm text-gray-900 bg-white/80 border border-white/70 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-violet-300 focus:border-violet-300 transition-all"
       />
     </div>
   );
@@ -247,6 +244,8 @@ function ClientDetailsCard() {
 
   /* ── Edit actions ── */
   function startEdit() {
+    if (!rawRecord) return;
+
     setEditVals({
       First_Name:    rawRecord.First_Name || '',
       Last_Name:     rawRecord.Last_Name || '',
@@ -325,11 +324,22 @@ function ClientDetailsCard() {
           {isEditing && (
             <span className="text-xs text-gray-400">Enter · Esc</span>
           )}
+          {isEditing ? (
+            <button type="button" onClick={() => doSave(editVals)} disabled={saving} title="Save"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-700 transition-colors hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-50">
+              <CheckIcon size={15} />
+            </button>
+          ) : (
+            <button type="button" onClick={startEdit} title="Edit"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white/80 text-gray-700 transition-colors hover:bg-gray-50">
+              <EditIcon size={15} />
+            </button>
+          )}
         </div>
       </div>
 
       {/* Rows */}
-      <div className="mt-2 divide-y divide-gray-100">
+      <div className={isEditing ? 'mt-2 space-y-1' : 'mt-2 divide-y divide-gray-100'}>
         {isEditing ? (
           <>
             <EditRow label="First Name" field="First_Name" value={editVals.First_Name} autoFocus onChange={handleFieldChange} />
@@ -357,39 +367,6 @@ function ClientDetailsCard() {
       </div>
 
       {saveError && <p className="mt-2 text-xs text-red-500 text-center">{saveError}</p>}
-
-      <div className="mt-auto">
-        <div className="border-t border-gray-200 mt-3 mb-3" />
-
-        {/* Actions */}
-        {isEditing ? (
-          <div className="flex gap-2">
-            <button onClick={() => doSave(editVals)} disabled={saving}
-              className="flex items-center justify-center gap-1.5 flex-1 py-2.5 rounded-lg bg-gray-900 hover:bg-gray-700 text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-              <CheckIcon size={14} />{saving ? 'Saving…' : 'Save'}
-            </button>
-            <button onClick={doCancel} disabled={saving}
-              className="flex items-center justify-center gap-1.5 flex-1 py-2.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-600 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-              <XIcon size={14} />Cancel
-            </button>
-          </div>
-        ) : (
-          <div className="flex gap-2">
-            <button onClick={startEdit}
-              className="flex items-center justify-center gap-1.5 flex-1 py-2.5 rounded-lg bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 text-sm font-medium transition-colors">
-              <EditIcon size={14} />Edit
-            </button>
-            <button onClick={() => { /* TODO: Zoho email compose */ }}
-              className="flex items-center justify-center gap-1.5 flex-1 py-2.5 rounded-lg bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 text-sm font-medium transition-colors">
-              <EmailIcon size={14} />Send Email
-            </button>
-            <button onClick={() => { /* TODO: Zoho SMS action */ }}
-              className="flex items-center justify-center gap-1.5 flex-1 py-2.5 rounded-lg bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 text-sm font-medium transition-colors">
-              <SmsIcon size={14} />Send SMS
-            </button>
-          </div>
-        )}
-      </div>
 
     </div>
   );

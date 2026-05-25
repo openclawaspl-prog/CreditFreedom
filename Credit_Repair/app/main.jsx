@@ -314,8 +314,46 @@ const DisputeWidget = () => {
   const [contactId, setContactId] = useState('');
   const [entityName, setEntityName] = useState('Contacts');
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   useDynamicHeight();
+
+  async function refreshWidgetData() {
+    if (refreshing) return;
+    setRefreshing(true);
+    const startedAt = Date.now();
+
+    if (!contactId || !window.ZOHO) {
+      setRefreshing(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const [contactData, accountRows] = await Promise.all([
+        fetchContact(window.ZOHO, entityName || 'Contacts', contactId),
+        fetchAccounts(window.ZOHO, entityName || 'Contacts', contactId),
+      ]);
+      const safeAccounts = Array.isArray(accountRows)
+        ? accountRows.filter(row => !isSoftDeletedAccount(row))
+        : [];
+
+      setAccounts(safeAccounts);
+      setCounts(buildCounts(safeAccounts));
+      setContact(contactData ? pickContact(contactData) : {});
+      setRefreshKey(prev => prev + 1);
+    } catch (error) {
+      console.error('[CF] refresh error:', formatZohoError(error));
+    } finally {
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < 2500) {
+        await new Promise(resolve => setTimeout(resolve, 2500 - elapsed));
+      }
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }
 
   useEffect(() => {
     let alive = true;
@@ -420,27 +458,46 @@ const DisputeWidget = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <ActionButtonsBar contactId={contactId} entity={entityName} />
+        <button
+          type="button"
+          onClick={refreshWidgetData}
+          disabled={refreshing}
+          className="inline-flex h-9 items-center gap-1.5 rounded-full border border-slate-200 bg-white/82 px-3.5 text-sm font-bold leading-none text-black shadow-sm transition-all whitespace-nowrap backdrop-blur-md hover:bg-white hover:border-slate-300 focus:outline-none focus:ring-4 focus:ring-sky-100"
+          style={{ boxShadow: '0 10px 24px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.72)' }}
+        >
+          <svg className={refreshing ? 'animate-spin' : ''} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M21 12a9 9 0 0 1-15.4 6.4" />
+            <path d="M3 12A9 9 0 0 1 18.4 5.6" />
+            <path d="M18 2v4h4" />
+            <path d="M6 22v-4H2" />
+          </svg>
+          {refreshing ? 'Refreshing...' : 'Refresh'}
+        </button>
       </div>
 
       <div className="grid grid-cols-1 gap-4 items-start" style={{ gridTemplateColumns: '1fr' }}>
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-start">
-          <div className="lg:col-span-3">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+          <div className="lg:col-span-7">
             <CreditScoresCard record={c} contactId={contactId} />
             <div id="account-bulk-controls-slot" className="mt-4" />
           </div>
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-5">
             <DisputeStatusTable counts={counts} />
           </div>
         </div>
       </div>
 
+      <div id="account-bulk-actions-slot" className="w-full" />
+
       <AccountsDetailTable
         contactId={contactId}
         accounts={accounts}
         entityName={entityName}
+        refreshKey={refreshKey}
         bulkControlsTargetId="account-bulk-controls-slot"
+        bulkActionsTargetId="account-bulk-actions-slot"
       />
     </div>
   );

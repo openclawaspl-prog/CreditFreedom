@@ -158,7 +158,8 @@ function StartedAccountsCard() {
       Entity: 'Client_Account',
       APIData: {
         id,
-        Delete_flag: 'true',
+        Block_Type: 'removed',
+        Display_Status: 'Deleted',
       },
       Trigger: ['workflow'],
     })

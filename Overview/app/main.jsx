@@ -253,7 +253,6 @@ const MainWidget = () => {
             <CreditBureauAutomationCard />
             <ProgramEligibilityCard />
           </div>
-          <TotalBalanceCard />
         </div>
       </div>
 

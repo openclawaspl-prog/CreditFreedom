@@ -346,11 +346,8 @@ function ClientDetailsCard() {
             <EditRow label="Last Name" field="Last_Name" value={editVals.Last_Name} onChange={handleFieldChange} />
             <EditRow label="SSN" field="Social_Security_Number" value={editVals.Social_Security_Number} onChange={handleFieldChange} />
             <EditRow label="Date of Birth" field="Date_of_Birth" value={editVals.Date_of_Birth} type="date" onChange={handleFieldChange} />
-            <DisplayRow label="Assigned To"   value={client.assignedTo}  bold />
             <EditRow label="Office Phone"  field="Office_Phone"  value={editVals.Office_Phone}  type="tel"   onChange={handleFieldChange} />
             <EditRow label="Primary Email" field="Email"         value={editVals.Email}          type="email" onChange={handleFieldChange} />
-            <DisplayRow label="Created" value={client.created} bold />
-            <DisplayRow label="Updated" value={client.updated} bold />
           </>
         ) : (
           <>

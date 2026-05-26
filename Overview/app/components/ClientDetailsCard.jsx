@@ -233,10 +233,6 @@ function ClientDetailsCard() {
     if (!isEditing) return;
     const onKey = (e) => {
       if (e.key === 'Escape') doCancel();
-      if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
-        e.preventDefault();
-        doSave(editValsRef.current);
-      }
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);

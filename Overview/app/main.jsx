@@ -223,6 +223,37 @@ function useDynamicHeight() {
 const MainWidget = () => {
   useZohoPageLoadBridge();
   useDynamicHeight();
+  const [showLoginCredentials, setShowLoginCredentials] = React.useState(false);
+  const [loginModalTop, setLoginModalTop] = React.useState(24);
+  const [loginModalAnchorX, setLoginModalAnchorX] = React.useState(0);
+  const loginButtonRef = React.useRef(null);
+  const MonitorLoginWidget = window.OverviewMonitorLoginWidget;
+
+  React.useEffect(() => {
+    window.OverviewWidget.requestResize();
+  }, [showLoginCredentials]);
+
+  React.useEffect(() => {
+    if (!showLoginCredentials) return undefined;
+
+    const bodyOverflow = document.body.style.overflow;
+    const htmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = bodyOverflow;
+      document.documentElement.style.overflow = htmlOverflow;
+    };
+  }, [showLoginCredentials]);
+
+  const openLoginCredentials = () => {
+    const buttonRect = loginButtonRef.current && loginButtonRef.current.getBoundingClientRect();
+    setLoginModalAnchorX(buttonRect ? Math.round(buttonRect.left + buttonRect.width / 2) : Math.round(window.innerWidth / 2));
+    setLoginModalTop(Math.max(16, Math.round((buttonRect ? buttonRect.top : 180) - 150)));
+    setShowLoginCredentials(true);
+  };
+
   return (
     <div id="overview-content" className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
       <div className="lg:col-span-2 space-y-4">
@@ -264,6 +295,18 @@ const MainWidget = () => {
           <ActivitiesCard />
         </div>
         <div className="space-y-4">
+          <button
+            ref={loginButtonRef}
+            type="button"
+            onClick={openLoginCredentials}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/70 bg-white/65 px-5 py-3 text-sm font-semibold text-slate-900 shadow-[0_16px_34px_rgba(15,23,42,0.10)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/80"
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="11" width="18" height="10" rx="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            Show Login Credentials
+          </button>
           <LogginCredentialsCard cardTitles={['Equifax Login', 'Transunion Login', 'Experian Monitoring Login']} />
         </div>
       </div>
@@ -274,6 +317,38 @@ const MainWidget = () => {
         </div>
         <BillingNotesCard />
       </div>
+
+      {showLoginCredentials && MonitorLoginWidget && (
+        <div className="fixed inset-0 z-50 bg-slate-950/45 p-4 backdrop-blur-sm">
+          <div
+            className="absolute left-4 right-4 flex flex-col overflow-hidden rounded-2xl border border-white/75 bg-white/65 shadow-[0_34px_90px_rgba(15,23,42,0.28),inset_0_1px_0_rgba(255,255,255,0.88)] backdrop-blur-2xl"
+            style={{
+              top: `${loginModalTop}px`,
+              maxHeight: `min(760px, calc(100vh - ${loginModalTop + 16}px))`,
+              transformOrigin: `${loginModalAnchorX}px top`,
+            }}
+          >
+            <div className="flex items-center justify-between border-b border-white/70 px-5 py-4">
+              <h2 className="text-lg font-bold text-slate-900">Login Credentials</h2>
+              <button
+                type="button"
+                onClick={() => setShowLoginCredentials(false)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/70 bg-white/70 text-slate-900 shadow-sm transition hover:bg-white"
+                title="Close"
+                aria-label="Close login credentials"
+              >
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M18 6 6 18"></path>
+                  <path d="m6 6 12 12"></path>
+                </svg>
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+              <MonitorLoginWidget />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

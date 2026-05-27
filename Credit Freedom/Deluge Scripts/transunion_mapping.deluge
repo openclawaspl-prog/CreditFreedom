@@ -1,0 +1,152 @@
+string standalone.Automation(map crmAPIRequest)
+{
+    body = crmAPIRequest.get("body");
+    info "Received Body: " + body;
+
+    credit_score = body.get("credit_score");
+    personal_information = body.get("personal_information");
+    accounts = body.get("accounts");
+    collection = body.get("collection");
+    inquiry = body.get("inquiry");
+
+    Bureau_Score = Map();
+    Bureau_Score.put("Name","Credit score");
+    Bureau_Score.put("Creditor","Transunion");
+    Bureau_Score.put("Client",credit_score.get("record_id"));
+    Bureau_Score.put("Creditor_Score",credit_score.get("credit_score"));
+
+    resp1 = zoho.crm.createRecord("Bureau_Score",Bureau_Score,{"trigger":{"workflow"}});
+    info resp1;
+
+    if(personal_information != null)
+    {
+        identification = personal_information.get("identification");
+        for each id_item in identification
+        {
+            for each id_key in id_item.keySet()
+            {
+                id_value = id_item.get(id_key);
+                id_map = Map();
+                id_map.put("field_name",id_key);
+                id_map.put("field_value",id_value);
+                id_map.put("creditor","Transunion");
+                id_map.put("Client",personal_information.get("record_id"));
+                resp2 = zoho.crm.createRecord("Personal_Data",id_map,{"trigger":{"workflow"}});
+                info resp2;
+            }
+        }
+
+        contact_information = personal_information.get("contact_information");
+        for each addr_item in contact_information
+        {
+            address_value = addr_item.get("address");
+            if(address_value == null)
+            {
+                address_value = addr_item.get("full_address");
+            }
+            address_map = Map();
+            address_map.put("field_name","address");
+            address_map.put("field_value",address_value);
+            address_map.put("creditor","Transunion");
+            address_map.put("Client",personal_information.get("record_id"));
+            resp3 = zoho.crm.createRecord("Personal_Data",address_map,{"trigger":{"workflow"}});
+            info resp3;
+        }
+    }
+
+    if(accounts != null)
+    {
+        account_record_id = accounts.get("record_id");
+        if(account_record_id == null)
+        {
+            account_record_id = body.get("record_id");
+        }
+
+        for each account_item in accounts
+        {
+            account_status = account_item.get("account_status");
+            if(account_status == null)
+            {
+                account_status = account_item.get("pay_status");
+            }
+
+            high_balance = account_item.get("high_balance");
+            if(high_balance == null)
+            {
+                high_balance = account_item.get("high_balance_(hist.)");
+            }
+
+            credit_limit = account_item.get("credit_limit");
+            if(credit_limit == null)
+            {
+                credit_limit = account_item.get("credit_limit_(hist.)");
+            }
+
+            account_map = Map();
+            account_map.put("Name",account_item.get("account_name"));
+            account_map.put("Account_Type",account_item.get("account_type"));
+            account_map.put("Account_Number1",account_item.get("account_number"));
+            account_map.put("Account_Status",account_status);
+            account_map.put("Credit_Balance",account_item.get("balance"));
+            account_map.put("Old_Credit_Balance",high_balance);
+            account_map.put("Credit_Limit",credit_limit);
+            account_map.put("Remarks",account_item.get("remarks"));
+            account_map.put("Opened_Date",account_item.get("date_opened"));
+            account_map.put("Client_ID",account_record_id);
+            account_map.put("Creditor_Name","Transunion");
+            resp4 = zoho.crm.createRecord("Client_Account",account_map,{"trigger":{"workflow"}});
+            info resp4;
+        }
+    }
+
+    if(collection != null)
+    {
+        collection_details = collection.get("collection_details");
+        for each sub_collection in collection_details
+        {
+            collection_map = Map();
+            collection_map.put("Name",sub_collection.get("collection_agency"));
+            collection_map.put("Original_Creditor",sub_collection.get("original_creditor_name"));
+            collection_map.put("Opened_Date",sub_collection.get("date_assigned"));
+            collection_map.put("Agency_Balance",sub_collection.get("original_amount_owed"));
+            collection_map.put("CreditOrBalanceValue",sub_collection.get("amount"));
+            collection_map.put("Status",sub_collection.get("status"));
+            collection_map.put("Agency_Remark",sub_collection.get("comments"));
+            collection_map.put("Client_id",collection.get("record_id"));
+            collection_map.put("Creditor","Transunion");
+            resp5 = zoho.crm.createRecord("Collections",collection_map,{"trigger":{"workflow"}});
+            info resp5;
+        }
+    }
+
+    if(inquiry != null)
+    {
+        hard_inquires = inquiry.get("hard_inquires");
+        for each sub_inquiry in hard_inquires
+        {
+            inquiry_map = Map();
+            inquiry_map.put("Name",sub_inquiry.get("company"));
+            inquiry_map.put("Inquiry_Date",sub_inquiry.get("date"));
+            inquiry_map.put("Address",sub_inquiry.get("address"));
+            inquiry_map.put("Request_Originator",sub_inquiry.get("request_originator"));
+            inquiry_map.put("Client_id",inquiry.get("record_id"));
+            inquiry_map.put("Creditor","Transunion");
+            resp6 = zoho.crm.createRecord("Inquiry",inquiry_map,{"trigger":{"workflow"}});
+            info resp6;
+        }
+
+        soft_inquires = inquiry.get("soft_inquires");
+        for each sub_inquiry in soft_inquires
+        {
+            inquiry_map = Map();
+            inquiry_map.put("Name",sub_inquiry.get("company"));
+            inquiry_map.put("Inquiry_Date",sub_inquiry.get("date"));
+            inquiry_map.put("Address",sub_inquiry.get("address"));
+            inquiry_map.put("Request_Originator",sub_inquiry.get("request_originator"));
+            inquiry_map.put("Client_id",inquiry.get("record_id"));
+            inquiry_map.put("Creditor","Transunion");
+            resp7 = zoho.crm.createRecord("Inquiry",inquiry_map,{"trigger":{"workflow"}});
+            info resp7;
+        }
+    }
+}

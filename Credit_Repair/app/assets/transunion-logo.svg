@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 164 40" role="img" aria-labelledby="title">
-  <title>TransUnion</title>
-  <rect width="164" height="40" fill="none"/>
-  <text x="1" y="28" fill="#111111" font-family="Georgia, 'Times New Roman', serif" font-size="27">TransUnion</text>
-  <circle cx="148" cy="11" r="11" fill="none" stroke="#00a5bf" stroke-width="3"/>
-  <text x="141.8" y="14.5" fill="#00a5bf" font-family="Arial, sans-serif" font-size="10" font-weight="800">TU</text>
-  <circle cx="159" cy="5" r="3" fill="none" stroke="#00a5bf" stroke-width="1.2"/>
-  <text x="157.2" y="7.1" fill="#00a5bf" font-family="Arial, sans-serif" font-size="4" font-weight="700">R</text>
-</svg>

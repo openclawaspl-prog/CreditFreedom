@@ -353,8 +353,8 @@ function ClientDetailsCard() {
             <DisplayRow label="Assigned To"    value={client.assignedTo}    bold />
             <DisplayRow label="Office Phone"   value={client.officePhone}   />
             <DisplayRow label="Primary Email"  value={client.primaryEmail}  />
-            <DisplayRow label="Created"        value={client.created}       bold />
-            <DisplayRow label="Updated"        value={client.updated}       bold />
+            <DisplayRow label="Created Date"        value={client.created}       bold />
+            <DisplayRow label="Updated Date"        value={client.updated}       bold />
           </>
         )}
       </div>

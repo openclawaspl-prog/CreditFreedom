@@ -1,0 +1,14 @@
+.env
+.env.*
+*.log
+ZET-debug.log
+node_modules/
+dist/
+build/
+coverage/
+__pycache__/
+*.pyc
+*.pem
+.DS_Store
+Thumbs.db
+.vscode/

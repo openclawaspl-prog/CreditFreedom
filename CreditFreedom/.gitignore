@@ -1,0 +1,28 @@
+node_modules/
+.env
+dist/
+build/
+coverage/
+
+# Generated widget bundles
+**/app/**/*.js
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/
+
+# Python
+__pycache__/
+*.pyc
+
+# Environment
+.env.local
+.env.production

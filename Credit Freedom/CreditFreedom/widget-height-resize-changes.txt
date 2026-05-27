@@ -1,0 +1,68 @@
+Widget height resize changes
+============================
+
+Goal
+----
+Make Zoho widgets fit their visible content without adding an iframe scrollbar, cutting content, or continuously increasing height.
+
+Files changed
+-------------
+1. Credit_Repair/app/main.jsx
+2. Credit_Repair/app/widget.html
+3. Overview/app/main.jsx
+4. Overview/app/widget.html
+
+What changed
+------------
+1. The resize code now measures the actual React root content instead of document.body/documentElement.
+
+   New pattern:
+   - Find #root.
+   - Calculate root.scrollHeight.
+   - Add the body's top and bottom padding.
+   - Add a tiny 2px safety buffer.
+   - Send that value to ZOHO.CRM.UI.Resize.
+
+2. The ResizeObserver now observes #root instead of document.body.
+
+   Reason:
+   Observing document.body can create a feedback loop. Zoho changes the iframe height, body height changes, ResizeObserver fires again, and the widget keeps growing.
+
+3. Widget page scrolling is hidden at the html/body level.
+
+   CSS:
+   - html { overflow: hidden; }
+   - body { overflow: hidden; }
+
+   Reason:
+   The iframe itself should not show a scrollbar. Internal tables/cards can still have their own scrollbars where needed.
+
+4. Credit_Repair/app/widget.html no longer uses body min-height: 100vh.
+
+   Reason:
+   100vh inside a resized iframe makes the content height follow the iframe height. When the resize code adds extra pixels, the iframe grows, then 100vh grows, then the widget grows again.
+
+5. Overview/app/main.jsx no longer uses the old max-of-body/document resize calculation.
+
+   Removed behavior:
+   - document.body.scrollHeight
+   - document.documentElement.scrollHeight
+   - direct frameElement height assignment
+   - body/document ResizeObserver
+   - MutationObserver on body
+   - repeated interval resize loop
+
+Rollback notes
+--------------
+If the new resize behavior fails, revert these changes:
+
+1. Restore Credit_Repair/app/widget.html body min-height if needed:
+   body { min-height: 100vh; }
+
+2. Remove html/body overflow hidden if the parent should scroll:
+   html/body overflow: hidden
+
+3. Restore the old resize calculation in main.jsx:
+   document.body.scrollHeight + 32
+
+But the old pattern can cause continuous iframe growth in Zoho.

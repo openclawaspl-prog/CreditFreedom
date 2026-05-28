@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Utility Bills</title>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+  />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://live.zwidgets.com/js-sdk/1.0/ZohoEmbededAppSDK.min.js"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+    html { margin: 0; padding: 0; min-height: 100%; overflow: hidden; }
+    body {
+      margin: 0;
+      padding: 16px;
+      overflow: hidden;
+      background: #f4f6fb;
+      font-family: "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
+      color: #0f172a;
+    }
+    #root { position: relative; z-index: 1; }
+
+    .cf-page { display: flex; flex-direction: column; gap: 20px; }
+
+    .cf-card {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+    }
+
+    .cf-card-header {
+      padding: 18px 20px 0 20px;
+    }
+
+    .cf-card-header--tight {
+      padding-bottom: 8px;
+    }
+
+    .cf-card-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin: 0;
+      color: #0f172a;
+    }
+
+    .cf-card-body { padding: 16px 20px 20px; }
+
+    .cf-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #1f2937;
+      margin-bottom: 8px;
+    }
+
+    .cf-input,
+    .cf-select {
+      width: 100%;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 14px;
+      color: #0f172a;
+      background: #fff;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .cf-input:focus,
+    .cf-select:focus {
+      border-color: #1d4ed8;
+      box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.12);
+    }
+
+    .cf-input-icon,
+    .cf-select-icon {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 18px;
+      height: 18px;
+      color: #1f2937;
+      pointer-events: none;
+    }
+
+    .cf-select {
+      appearance: none;
+    }
+
+    .cf-primary-button {
+      background: #1e3a8a;
+      color: #ffffff;
+      font-weight: 600;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 20px;
+      width: 100%;
+      box-shadow: 0 6px 16px rgba(30, 58, 138, 0.28);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .cf-primary-button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 18px rgba(30, 58, 138, 0.3);
+    }
+
+    .cf-table-body { padding-top: 0; }
+
+    .cf-table-scroll { width: 100%; overflow-x: auto; }
+
+    .cf-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 14px;
+    }
+
+    .cf-table thead th {
+      text-align: left;
+      font-size: 12px;
+      font-weight: 700;
+      color: #64748b;
+      padding: 12px 16px;
+      border-bottom: 1px solid #e5e7eb;
+      background: #f8fafc;
+      white-space: nowrap;
+    }
+
+    .cf-table tbody td {
+      padding: 14px 16px;
+      border-bottom: 1px solid #eef2f7;
+      color: #0f172a;
+      white-space: nowrap;
+    }
+
+    .cf-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .cf-pill {
+      font-weight: 600;
+      color: #1e293b;
+    }
+
+    .cf-action {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: #1e40af;
+    }
+
+    .cf-icon-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: none;
+      background: transparent;
+      color: #1e40af;
+      font-weight: 600;
+      font-size: 12px;
+      cursor: pointer;
+      padding: 2px 0;
+    }
+
+    .cf-icon-button svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    @media (min-width: 768px) {
+      body { padding: 18px; }
+      .cf-primary-button { width: auto; }
+    }
+
+    @media (min-width: 1024px) {
+      body { padding: 22px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" src="./components/UtilityBillsWidget.jsx"></script>
+  <script type="text/babel" src="./main.jsx"></script>
+</body>
+</html>

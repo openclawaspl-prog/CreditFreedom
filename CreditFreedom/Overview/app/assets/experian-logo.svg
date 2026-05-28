@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 164 56" role="img" aria-labelledby="title">
+  <title>Experian</title>
+  <rect width="164" height="56" fill="none"/>
+  <rect x="0" y="21" width="14" height="14" rx="3" fill="#7a2bbf"/>
+  <rect x="20" y="3" width="12" height="12" rx="3" fill="#00a5df"/>
+  <rect x="39" y="12" width="9" height="9" rx="2" fill="#ec4899"/>
+  <rect x="20" y="37" width="10" height="10" rx="2" fill="#ec4899"/>
+  <rect x="40" y="34" width="7" height="7" rx="2" fill="#7a2bbf"/>
+  <text x="19" y="38" fill="#0056a4" font-family="Arial, Helvetica, sans-serif" font-size="35" font-weight="400">experian</text>
+  <text x="148" y="38" fill="#0056a4" font-family="Arial, Helvetica, sans-serif" font-size="35" font-weight="400">.</text>
+</svg>

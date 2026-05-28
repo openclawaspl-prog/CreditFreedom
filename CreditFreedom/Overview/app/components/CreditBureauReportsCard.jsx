@@ -189,12 +189,12 @@ function BureauCol({ name, score, max, gaugeId, logoSrc }) {
   const logoClass = name === 'Experian'
     ? 'h-9 w-auto max-w-[150px] object-contain'
     : name === 'TransUnion'
-      ? 'h-8 w-auto max-w-[170px] object-contain'
+      ? 'h-9 w-auto max-w-[150px] object-contain'
       : 'h-7 w-auto max-w-[150px] object-contain';
 
   return (
     <div className="flex h-full w-full min-w-0 flex-col items-center overflow-visible text-center">
-      <div className="flex h-12 w-full items-center justify-center overflow-visible px-2">
+      <div className="flex h-14 w-full min-w-0 items-center justify-center overflow-visible px-4">
         <img
           src={logoSrc}
           alt={name}
@@ -202,7 +202,7 @@ function BureauCol({ name, score, max, gaugeId, logoSrc }) {
         />
       </div>
 
-      <div className="flex h-[118px] w-full items-center justify-center">
+      <div className="flex h-[116px] w-full items-center justify-center">
         <div className="h-[108px] w-[164px] max-w-full">
           <SpeedometerGauge value={score} max={max} gradientId={gaugeId} />
         </div>
@@ -240,7 +240,7 @@ function CreditBureauReportsCard() {
 
   const bureaus = [
     { name: 'Equifax', score: toScore(scores.Equifax), logoSrc: './assets/equifax-logo.svg' },
-    { name: 'TransUnion', score: toScore(scores.TransUnion), logoSrc: './assets/transunion-logo.svg' },
+    { name: 'TransUnion', score: toScore(scores.TransUnion), logoSrc: './assets/transunion-logo.svg?v=2' },
     { name: 'Experian', score: toScore(scores.Experian), logoSrc: './assets/experian-logo.svg' },
   ];
 

@@ -1,0 +1,266 @@
+string standalone.Experian_Automation(Map crmAPIRequest)
+{
+bodyString = crmAPIRequest.get("body");
+info "Received Body String: " + bodyString;
+body = Map();
+if(bodyString != null && bodyString != "")
+{
+	body = bodyString.toMap();
+}
+info "Converted Body Map: " + body;
+credit_score = body.get("credit_score");
+personal_information = body.get("personal_Information");
+accounts = body.get("accounts");
+collection = body.get("collection");
+inquiry = body.get("inquiry");
+if(credit_score != null)
+{
+	Bureau_Score = Map();
+	Bureau_Score.put("Name","Credit score");
+	Bureau_Score.put("Creditor","Experian");
+	Bureau_Score.put("Client",credit_score.get("record_id"));
+	Bureau_Score.put("Creditor_Score",credit_score.get("credit_score"));
+	resp1 = zoho.crm.createRecord("Bureau_Score",Bureau_Score,{"trigger":{"workflow"}});
+	info resp1;
+}
+if(personal_information != null)
+{
+	contact_information = personal_information.get("contact_information");
+	if(contact_information != null)
+	{
+		address_list = contact_information.get("address");
+		if(address_list != null)
+		{
+			for each  addr_item in address_list
+			{
+				address_value = addr_item.get("full_address");
+				if(address_value == null)
+				{
+					address_value = addr_item.get("address");
+				}
+				address_map = Map();
+				address_map.put("Name","address");
+				address_map.put("Field_Value",address_value);
+				address_map.put("Creditor","Experian");
+				address_map.put("Client",personal_information.get("record_id"));
+				resp2 = zoho.crm.createRecord("Personal_Data",address_map,{"trigger":{"workflow"}});
+				info resp2;
+			}
+		}
+	}
+	identification = personal_information.get("identification");
+	if(identification != null)
+	{
+		for each  id_item in identification
+		{
+			keys_list = id_item.keys();
+			for each  id_key in keys_list
+			{
+				id_map = Map();
+				id_map.put("Name",id_key);
+				id_map.put("Field_Value",id_item.get(id_key));
+				id_map.put("Creditor","Experian");
+				id_map.put("Client",personal_information.get("record_id"));
+				resp3 = zoho.crm.createRecord("Personal_Data",id_map,{"trigger":{"workflow"}});
+				info resp3;
+			}
+		}
+	}
+}
+if(accounts != null)
+{
+	account_open_map = accounts.get("open_accounts");
+	if(account_open_map != null)
+	{
+		for each  sub_open in account_open_map
+		{
+			opened_date = "";
+			if(sub_open.get("date_opened") != null && sub_open.get("date_opened") != "")
+			{
+				try 
+				{
+					date_obj = sub_open.get("date_opened").toDate("MMM dd, yyyy");
+					opened_date = date_obj.toString("yyyy-MM-dd") + "T00:00:00+05:30";
+				}
+				catch (e)
+				{
+					info e;
+				}
+			}
+			account_number = ifnull(sub_open.get("account_number"),"").toString();
+			account_number = account_number.replaceAll("[^0-9]","");
+			account_map = Map();
+			account_map.put("Name",sub_open.get("account_name"));
+			account_map.put("Account_Type",sub_open.get("account_type"));
+			if(account_number != "")
+			{
+				account_map.put("Account_Number1",account_number.toLong());
+			}
+			account_map.put("Account_Status",sub_open.get("account_status"));
+			if(opened_date != "")
+			{
+				account_map.put("Opened_Date",opened_date);
+			}
+			account_map.put("Credit_Balance",ifnull(sub_open.get("balance"),"").toString());
+			account_map.put("Old_Credit_Balance",ifnull(sub_open.get("high_credit"),"").toString());
+			account_map.put("block_type",sub_open.get("block_type"));
+			account_map.put("count_late_payment",sub_open.get("count_late_payment"));
+			account_map.put("past_due",sub_open.get("past_due"));
+			account_map.put("past_due_amount",sub_open.get("past_due_amount"));
+			account_map.put("Client_ID",sub_open.get("record_id"));
+			account_map.put("Creditor_Name","Experian");
+			resp_open = zoho.crm.createRecord("Client_Account",account_map,{"trigger":{"workflow"}});
+			info resp_open;
+		}
+	}
+	account_close_map = accounts.get("closed_accounts");
+	if(account_close_map != null)
+	{
+		for each  sub_close in account_close_map
+		{
+			opened_date = "";
+			if(sub_close.get("date_opened") != null && sub_close.get("date_opened") != "")
+			{
+				try 
+				{
+					date_obj = sub_close.get("date_opened").toDate("MMM dd, yyyy");
+					opened_date = date_obj.toString("yyyy-MM-dd") + "T00:00:00+05:30";
+				}
+				catch (e)
+				{
+					info e;
+				}
+			}
+			account_number = ifnull(sub_close.get("account_number"),"").toString();
+			account_map = Map();
+			account_map.put("Name",sub_close.get("account_name"));
+			account_map.put("Account_Type",sub_close.get("account_type"));
+			if(account_number != "")
+			{
+				account_map.put("Account_Number1",account_number);
+			}
+			account_map.put("Account_Status",sub_close.get("account_status"));
+			if(opened_date != "")
+			{
+				account_map.put("Opened_Date",opened_date);
+			}
+			account_map.put("Credit_Balance",ifnull(sub_close.get("balance"),"").toString());
+			account_map.put("Old_Credit_Balance",ifnull(sub_close.get("high_credit"),"").toString());
+			account_map.put("block_type",sub_close.get("block_type"));
+			account_map.put("count_late_payment",sub_close.get("count_late_payment"));
+			account_map.put("past_due",sub_close.get("past_due"));
+			account_map.put("past_due_amount",sub_close.get("past_due_amount"));
+			account_map.put("Client_ID",sub_close.get("record_id"));
+			account_map.put("Creditor_Name","Experian");
+			resp_close = zoho.crm.createRecord("Client_Account",account_map,{"trigger":{"workflow"}});
+			info resp_close;
+		}
+	}
+}
+if(collection != null)
+{
+	collection_details = collection.get("collection_details");
+	if(collection_details != null)
+	{
+		for each  sub_collection in collection_details
+		{
+			collection_date = "";
+			if(sub_collection.get("date_assigned") != null && sub_collection.get("date_assigned") != "")
+			{
+				try 
+				{
+					date_obj = sub_collection.get("date_assigned").toDate("MMM dd, yyyy");
+					collection_date = date_obj.toString("yyyy-MM-dd") + "T00:00:00+05:30";
+				}
+				catch (e)
+				{
+					info e;
+				}
+			}
+			collection_map = Map();
+			collection_map.put("Name",sub_collection.get("collection_agency"));
+			collection_map.put("Original_Creditor",sub_collection.get("original_creditor_name"));
+			if(collection_date != "")
+			{
+				collection_map.put("Opened_Date",collection_date);
+			}
+			collection_map.put("Agency_Balance",ifnull(sub_collection.get("original_amount_owed"),"").toString());
+			collection_map.put("CreditOrBalanceValue",ifnull(sub_collection.get("amount"),"").toString());
+			collection_map.put("Agency_Remark",sub_collection.get("comment"));
+			collection_map.put("Status",sub_collection.get("status"));
+			collection_map.put("Client_id",collection.get("record_id"));
+			collection_map.put("Creditor","Experian");
+			resp6 = zoho.crm.createRecord("Collection",collection_map,{"trigger":{"workflow"}});
+			info resp6;
+		}
+	}
+}
+if(inquiry != null)
+{
+	hard_inquires = inquiry.get("hard_inquires");
+	if(hard_inquires != null)
+	{
+		for each  sub_inquiry in hard_inquires
+		{
+			inquiry_date = "";
+			if(sub_inquiry.get("date") != null && sub_inquiry.get("date") != "")
+			{
+				try 
+				{
+					inquiry_date = sub_inquiry.get("date").toDate("MMM dd, yyyy").toString("yyyy-MM-dd");
+				}
+				catch (e)
+				{
+					info e;
+				}
+			}
+			inquiry_map = Map();
+			inquiry_map.put("Name",sub_inquiry.get("company"));
+			if(inquiry_date != "")
+			{
+				inquiry_map.put("Inquiry_Date",inquiry_date);
+			}
+			inquiry_map.put("Address",sub_inquiry.get("address"));
+			inquiry_map.put("Request_Originator",sub_inquiry.get("request_originator"));
+			inquiry_map.put("Inquiry_Type","Hard");
+			inquiry_map.put("Client_id",inquiry.get("record_id"));
+			inquiry_map.put("Creditor","Experian");
+			resp_hard_inquiry = zoho.crm.createRecord("Inquiries",inquiry_map,{"trigger":{"workflow"}});
+			info resp_hard_inquiry;
+		}
+	}
+	soft_inquires = inquiry.get("soft_inquires");
+	if(soft_inquires != null)
+	{
+		for each  sub_inquiry in soft_inquires
+		{
+			inquiry_date = "";
+			if(sub_inquiry.get("date") != null && sub_inquiry.get("date") != "")
+			{
+				try 
+				{
+					inquiry_date = sub_inquiry.get("date").toDate("MMM dd, yyyy").toString("yyyy-MM-dd");
+				}
+				catch (e)
+				{
+					info e;
+				}
+			}
+			inquiry_map = Map();
+			inquiry_map.put("Name",sub_inquiry.get("company"));
+			if(inquiry_date != "")
+			{
+				inquiry_map.put("Inquiry_Date",inquiry_date);
+			}
+			inquiry_map.put("Address",sub_inquiry.get("address"));
+			inquiry_map.put("Request_Originator",sub_inquiry.get("request_originator"));
+			inquiry_map.put("Inquiry_Type","Soft");
+			inquiry_map.put("Client_id",inquiry.get("record_id"));
+			inquiry_map.put("Creditor","Experian");
+			resp_soft_inquiry = zoho.crm.createRecord("Inquiries",inquiry_map,{"trigger":{"workflow"}});
+			info resp_soft_inquiry;
+		}
+	}
+}
+return body;
+}
